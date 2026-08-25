@@ -91,9 +91,12 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath }: A
       },
     });
 
-    gsap.from('.admin-credential-card', {
-      y: 42,
-      opacity: 0,
+    gsap.fromTo('.admin-credential-card', {
+      opacity: 0.32,
+      scale: 0.985,
+    }, {
+      opacity: 1,
+      scale: 1,
       stagger: 0.12,
       ease: 'power3.out',
       scrollTrigger: {
