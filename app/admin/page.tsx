@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Admin — ResumeProof Match',
-  description: 'ResumeProof Match operations dashboard prototype.',
+  description: 'ResumeProof Match private operations dashboard.',
   robots: { index: false, follow: false },
 };
 
