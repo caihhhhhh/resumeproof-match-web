@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useLanguage } from './components/language-context';
 import { SiteFooter } from './components/site-footer';
+import { trackEvent } from './lib/analytics';
 
 const copy = {
   zh: {
@@ -104,7 +105,7 @@ export default function Home() {
           </h1>
           <p className="hero-copy">{t.intro}</p>
           <div className="hero-actions">
-            <Link className="primary-link" href="/match/new">{t.primary}<span aria-hidden="true">→</span></Link>
+            <Link className="primary-link" href="/match/new" onClick={() => trackEvent('match_started', { source: 'homepage' })}>{t.primary}<span aria-hidden="true">→</span></Link>
             <a className="text-link" href="#example">{t.secondary}<span aria-hidden="true">↘</span></a>
           </div>
         </div>

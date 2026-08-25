@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { LanguageProvider } from './components/language-context';
+import { GoogleAnalytics } from './components/google-analytics';
 import './globals.css';
 
 const geistSans = Geist({
@@ -43,6 +44,7 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <LanguageProvider>{children}</LanguageProvider>
+        <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
       </body>
     </html>
   );

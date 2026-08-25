@@ -8,6 +8,7 @@ import { SiteFooter } from '../../components/site-footer';
 import { useLanguage } from '../../components/language-context';
 import { EvidenceStatus, isMatchAnalysis, MatchAnalysis } from '../../lib/match-analysis';
 import { identifyJobSource, sourceLabels } from '../../lib/job-source';
+import { fileSizeBucket, trackEvent } from '../../lib/analytics';
 
 type Screen = 'materials' | 'results' | 'review';
 type InputMode = 'upload' | 'paste';
@@ -377,14 +378,20 @@ export default function NewMatchPage() {
       setResumeFile(null); setResumeName(''); setResumeState('error'); setResumeError(t.tooLarge); event.target.value = ''; return;
     }
     setResumeFile(file); setResumeName(file.name); setResumeText(''); setResumeState('working'); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    trackEvent('resume_upload_started', { file_type: fileExtension(file.name), file_size: fileSizeBucket(file.size) });
     try {
       const localText = await readResumeFile(file).catch(() => '');
       const usedOcr = localText.length < 80;
       const text = usedOcr ? await recognizeResumeFile(file, language) : localText;
       setResumeText(text.length >= 80 ? text : '');
       setResumeNeedsReview(usedOcr && text.length >= 80);
-      if (text.length >= 80) setResumeState('ready');
-      else { setResumeState('error'); setResumeError(t.ocrFailed); }
+      if (text.length >= 80) {
+        setResumeState('ready');
+        trackEvent('resume_upload_completed', { file_type: fileExtension(file.name), extraction: usedOcr ? 'ocr' : 'local' });
+      } else {
+        setResumeState('error'); setResumeError(t.ocrFailed);
+        trackEvent('resume_upload_failed', { reason: 'insufficient_text', extraction: usedOcr ? 'ocr' : 'local' });
+      }
     } catch (error) {
       setResumeText('');
       setResumeNeedsReview(false);
@@ -398,6 +405,7 @@ export default function NewMatchPage() {
               : t.ocrFailed;
       setResumeError(message);
       setResumeState('error');
+      trackEvent('resume_upload_failed', { reason: code.slice(0, 36), file_type: fileExtension(file.name) });
     }
   }
 
@@ -423,7 +431,9 @@ export default function NewMatchPage() {
     } catch {
       setJdState('error'); setJdMessage(t.invalidUrl); return;
     }
-    setJdSource(sourceLabels[identifyJobSource(parsedUrl.toString())]); setJdState('working'); setJdMessage('');
+    const source = sourceLabels[identifyJobSource(parsedUrl.toString())];
+    setJdSource(source); setJdState('working'); setJdMessage('');
+    trackEvent('jd_link_parse_started', { source });
     try {
       const response = await fetch('/api/jd/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: parsedUrl.toString() }) });
       const data = (await response.json()) as { status?: string; error?: string; sourceLabel?: string; canonicalUrl?: string; jdText?: string; title?: string; company?: string; location?: string };
@@ -431,9 +441,10 @@ export default function NewMatchPage() {
       if (data.canonicalUrl) setJdEntry(data.canonicalUrl);
       if (data.status === 'success' && data.jdText) {
         setJdText(data.jdText); setJobTitle(data.title ?? ''); setJobCompany(data.company ?? ''); setJobLocation(data.location ?? ''); setJdState('ready'); setJdMessage(t.linkParsed);
+        trackEvent('jd_link_parse_completed', { source: data.sourceLabel || source });
       } else if (data.error === 'SITE_RATE_LIMIT') { setJdState('error'); setJdMessage(t.siteRate); }
-      else { setJdState('paste_required'); setJdMessage(t.pasteRequired); }
-    } catch { setJdState('paste_required'); setJdMessage(t.pasteRequired); }
+      else { setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: data.error || 'paste_required', source }); }
+    } catch { setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: 'network_error', source }); }
   }
 
   const resumeReady = resumeText.trim().length >= 80;
@@ -476,6 +487,7 @@ export default function NewMatchPage() {
     setConfirmedAt('');
     setReviewMode('preview');
     setScreen('review');
+    trackEvent('review_draft_built', { adopted_suggestions: adoptedSuggestions.length, template: selectedTemplate });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -484,6 +496,7 @@ export default function NewMatchPage() {
     setConfirmedDraft(reviewDraft);
     setConfirmedAt(new Date().toISOString());
     setReviewMode('preview');
+    trackEvent('review_draft_confirmed', { adopted_suggestions: adoptedSuggestions.length, template: selectedTemplate });
   }
 
   function editReviewDraft(value: string) {
@@ -508,6 +521,7 @@ export default function NewMatchPage() {
     anchor.click();
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    trackEvent('resume_exported', { format: 'html', template: selectedTemplate });
   }
 
   function printResume() {
@@ -515,11 +529,13 @@ export default function NewMatchPage() {
     document.title = resumeFileBase();
     window.print();
     document.title = previousTitle;
+    trackEvent('resume_exported', { format: 'print_pdf', template: selectedTemplate });
   }
 
   async function runAiAnalysis() {
     if (!resumeReady || !jdReady || analysisState === 'working') return;
     setAnalysisSeconds(0); setAnalysisState('working'); setAnalysisError(''); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    trackEvent('analysis_started', { resume_method: resumeMode, jd_method: looksLikeUrl ? 'url' : 'paste', language });
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 70_000);
     try {
@@ -541,12 +557,16 @@ export default function NewMatchPage() {
           DEEPSEEK_TIMEOUT: t.aiTimeout,
         };
         setAnalysisError(errors[data.error ?? ''] ?? t.aiFailed);
+        trackEvent('analysis_failed', { reason: (data.error || 'invalid_report').slice(0, 36) });
         setAnalysisState('error'); return;
       }
       setResumeNeedsReview(false); setAnalysis(data.analysis); setAnalysisState('idle'); setScreen('results');
+      trackEvent('analysis_completed', { grade: data.analysis.grade, score_band: `${Math.floor(data.analysis.overall / 10) * 10}s`, suggestion_count: data.analysis.suggestions.length });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      setAnalysisError(error instanceof DOMException && error.name === 'AbortError' ? t.aiTimeout : t.aiFailed); setAnalysisState('error');
+      const reason = error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'network_error';
+      setAnalysisError(reason === 'timeout' ? t.aiTimeout : t.aiFailed); setAnalysisState('error');
+      trackEvent('analysis_failed', { reason });
     } finally { window.clearTimeout(timeout); }
   }
 
@@ -618,7 +638,7 @@ export default function NewMatchPage() {
           </div>
           <div className="signal-grid"><section><h2>{t.coveredTitle}</h2><div className="term-cloud">{analysis.coveredTerms.map((term) => <span key={term}>{term}</span>)}</div></section><section className="missing-signals"><h2>{t.missingTitle}</h2><div className="term-cloud">{analysis.missingTerms.map((term) => <span key={term}>{term}</span>)}</div><p>{t.missingAdvice}</p></section></div>
           <details className="evidence-section"><summary><div><h2>{t.evidenceTitle}</h2><p>{t.evidenceBody}</p></div><span>{analysis.evidence.length}</span></summary><div className="evidence-list">{analysis.evidence.map((item, index) => <article key={`${item.requirement}-${index}`}><div className="evidence-topline"><span className={`evidence-status status-${item.status}`}>{statusCopy[item.status]}</span><small>{item.importance}</small></div><p className="evidence-requirement">{item.requirement}</p>{item.resumeEvidence.length ? <blockquote><span>{t.evidenceQuote}</span>{item.resumeEvidence.join(' / ')}</blockquote> : <small>{t.noMatchedTerms}</small>}<p className="evidence-rationale"><span>{t.whyMatch}</span>{item.rationale}</p></article>)}</div></details>
-          <OptimizationReview analysis={analysis} language={language} decisions={suggestionDecisions} notes={suggestionNotes} onDecision={(id, decision) => setSuggestionDecisions((current) => ({ ...current, [id]: decision }))} onNote={(id, note) => setSuggestionNotes((current) => ({ ...current, [id]: note }))} onBack={() => setScreen('materials')} onBuildDraft={buildTextReview} />
+          <OptimizationReview analysis={analysis} language={language} decisions={suggestionDecisions} notes={suggestionNotes} onDecision={(id, decision) => { setSuggestionDecisions((current) => ({ ...current, [id]: decision })); trackEvent('suggestion_reviewed', { decision }); }} onNote={(id, note) => setSuggestionNotes((current) => ({ ...current, [id]: note }))} onBack={() => setScreen('materials')} onBuildDraft={buildTextReview} />
         </section>
       ) : screen === 'review' && analysis ? (
         <section className="text-review-shell" aria-labelledby="text-review-title">
