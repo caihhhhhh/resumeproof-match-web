@@ -35,7 +35,13 @@ const feedback = [
   { score: '4.1', label: '愿意再次使用', value: 76 },
 ] as const;
 
-export default function AdminDashboard() {
+type AdminDashboardProps = {
+  adminName: string;
+  adminEmail: string;
+  signOutPath: string;
+};
+
+export default function AdminDashboard({ adminName, adminEmail, signOutPath }: AdminDashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState<'今日' | '7 天' | '30 天'>('今日');
   const [search, setSearch] = useState('');
@@ -124,6 +130,7 @@ export default function AdminDashboard() {
           <span className="admin-online-dot" />
           <div><b>系统运行正常</b><span>示例数据模式</span></div>
         </div>
+        <a className="admin-signout" href={signOutPath}>退出管理员</a>
       </aside>
 
       <main className="admin-main">
@@ -138,7 +145,10 @@ export default function AdminDashboard() {
                 <button key={item} className={range === item ? 'is-active' : ''} onClick={() => setRange(item)}>{item}</button>
               ))}
             </div>
-            <button className="admin-avatar" aria-label="管理员账户">W</button>
+            <div className="admin-account" title={adminEmail}>
+              <span><b>{adminName}</b><small>管理员</small></span>
+              <button className="admin-avatar" aria-label={`管理员账户：${adminName}`}>{adminName.slice(0, 1).toUpperCase()}</button>
+            </div>
           </div>
         </header>
 
