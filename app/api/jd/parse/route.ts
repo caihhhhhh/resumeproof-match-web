@@ -1,5 +1,6 @@
 import { identifyJobSource, sourceLabels } from '../../../lib/job-source';
 import { guardApiRequest, privateJson } from '../../../lib/request-guard';
+import { trackRuntimeResponse } from '../../../lib/runtime-telemetry';
 
 const FETCHABLE_HOSTS = new Set([
   'www.liepin.com',
@@ -124,39 +125,43 @@ async function fetchPublicPage(startUrl: URL) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const done = (result: Response, status?: 'success' | 'failure' | 'fallback') => trackRuntimeResponse(startedAt, {
+    requestType: 'jd_parse', provider: 'local', model: 'structured-data-parser',
+  }, result, status);
   const blocked = guardApiRequest(request, { bucket: 'jd-parse', limit: 30, maxBytes: 4_096 });
-  if (blocked) return blocked;
+  if (blocked) return done(blocked);
   let body: { url?: unknown };
   try {
     body = (await request.json()) as { url?: unknown };
   } catch {
-    return response({ status: 'error', code: 'INVALID_BODY' }, 400);
+    return done(response({ status: 'error', code: 'INVALID_BODY' }, 400));
   }
 
   if (typeof body.url !== 'string' || body.url.length > 2048) {
-    return response({ status: 'error', code: 'INVALID_URL' }, 400);
+    return done(response({ status: 'error', code: 'INVALID_URL' }, 400));
   }
 
   let url: URL;
   try {
     url = canonicalize(body.url);
   } catch (error) {
-    return response({ status: 'error', code: error instanceof Error ? error.message : 'INVALID_URL' }, 400);
+    return done(response({ status: 'error', code: error instanceof Error ? error.message : 'INVALID_URL' }, 400));
   }
 
   const source = identifyJobSource(url.toString());
   if (source === 'linkedin' || source === 'boss') {
-    return response({
+    return done(response({
       status: 'paste_required',
       source,
       sourceLabel: sourceLabels[source],
       canonicalUrl: url.toString(),
       code: source === 'linkedin' ? 'PLATFORM_RESTRICTED' : 'PUBLIC_FETCH_UNRELIABLE',
-    });
+    }), 'fallback');
   }
 
   if (source === 'unknown' || !FETCHABLE_HOSTS.has(url.hostname.toLowerCase())) {
-    return response({ status: 'paste_required', source, sourceLabel: sourceLabels[source], canonicalUrl: url.toString(), code: 'UNSUPPORTED_SOURCE' });
+    return done(response({ status: 'paste_required', source, sourceLabel: sourceLabels[source], canonicalUrl: url.toString(), code: 'UNSUPPORTED_SOURCE' }), 'fallback');
   }
 
   try {
@@ -174,15 +179,15 @@ export async function POST(request: Request) {
     }
 
     if (!posting) {
-      return response({ status: 'paste_required', source, sourceLabel: sourceLabels[source], canonicalUrl: finalUrl, code: 'NO_JOB_POSTING_DATA' });
+      return done(response({ status: 'paste_required', source, sourceLabel: sourceLabels[source], canonicalUrl: finalUrl, code: 'NO_JOB_POSTING_DATA' }), 'fallback');
     }
 
     const description = decodeHtml(stringValue(posting.description));
     if (description.length < 80) {
-      return response({ status: 'paste_required', source, sourceLabel: sourceLabels[source], canonicalUrl: finalUrl, code: 'INCOMPLETE_JOB_POSTING' });
+      return done(response({ status: 'paste_required', source, sourceLabel: sourceLabels[source], canonicalUrl: finalUrl, code: 'INCOMPLETE_JOB_POSTING' }), 'fallback');
     }
 
-    return response({
+    return done(response({
       status: 'success',
       source,
       sourceLabel: sourceLabels[source],
@@ -191,14 +196,14 @@ export async function POST(request: Request) {
       company: organizationName(posting.hiringOrganization),
       location: locationName(posting.jobLocation),
       jdText: description,
-    });
+    }));
   } catch (error) {
-    return response({
+    return done(response({
       status: 'paste_required',
       source,
       sourceLabel: sourceLabels[source],
       canonicalUrl: url.toString(),
       code: error instanceof Error ? error.message : 'FETCH_FAILED',
-    });
+    }), 'fallback');
   }
 }

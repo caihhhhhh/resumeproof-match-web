@@ -1,5 +1,6 @@
 import type { EvidenceItem, MatchAnalysis, OptimizationSuggestion, RequirementImportance, ScoreBreakdown } from '../../../lib/match-analysis';
 import { guardApiRequest, privateJson } from '../../../lib/request-guard';
+import { trackRuntimeResponse } from '../../../lib/runtime-telemetry';
 
 export const runtime = 'nodejs';
 
@@ -263,20 +264,25 @@ async function requestSuggestions(config: DeepSeekConfig, resume: string, jd: st
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
+  const done = (response: Response) => trackRuntimeResponse(startedAt, {
+    requestType: 'match', provider: 'deepseek', model,
+  }, response);
   const blocked = guardApiRequest(request, { bucket: 'match-analysis', limit: 8, maxBytes: 256 * 1024 });
-  if (blocked) return blocked;
+  if (blocked) return done(blocked);
   let body: { resumeText?: unknown; jdText?: unknown; language?: unknown };
-  try { body = await request.json(); } catch { return privateJson({ error: 'INVALID_JSON' }, { status: 400 }); }
+  try { body = await request.json(); } catch { return done(privateJson({ error: 'INVALID_JSON' }, { status: 400 })); }
   const resumeText = typeof body.resumeText === 'string' ? body.resumeText.trim() : '';
   const jdText = typeof body.jdText === 'string' ? body.jdText.trim() : '';
   const language = body.language === 'en' ? 'en' : 'zh';
-  if (resumeText.length < 80 || jdText.length < 80) return privateJson({ error: 'MATERIALS_TOO_SHORT' }, { status: 400 });
-  if (resumeText.length > 40_000 || jdText.length > 30_000) return privateJson({ error: 'MATERIALS_TOO_LONG' }, { status: 413 });
+  if (resumeText.length < 80 || jdText.length < 80) return done(privateJson({ error: 'MATERIALS_TOO_SHORT' }, { status: 400 }));
+  if (resumeText.length > 40_000 || jdText.length > 30_000) return done(privateJson({ error: 'MATERIALS_TOO_LONG' }, { status: 413 }));
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return privateJson({ error: 'AI_NOT_CONFIGURED' }, { status: 503 });
+  if (!apiKey) return done(privateJson({ error: 'AI_NOT_CONFIGURED' }, { status: 503 }));
 
-  const config: DeepSeekConfig = { apiKey, baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com', model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash' };
+  const config: DeepSeekConfig = { apiKey, baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com', model };
   const sources = resumeSources(resumeText);
   const [coreResult, suggestionResult] = await Promise.allSettled([
     requestCore(config, resumeText, jdText, language),
@@ -286,7 +292,7 @@ export async function POST(request: Request) {
     : suggestionResult.status === 'rejected' ? suggestionResult.reason : null;
   if (coreResult.status === 'rejected' && suggestionResult.status === 'rejected'
     && (initialFailure instanceof DeepSeekRequestError || initialFailure instanceof DeepSeekTimeoutError)) {
-    return deepSeekFailureResponse(initialFailure);
+    return done(deepSeekFailureResponse(initialFailure));
   }
 
   let suggestions = suggestionResult.status === 'fulfilled'
@@ -318,14 +324,14 @@ export async function POST(request: Request) {
       core: Boolean(raw), evidence: evidence.length, strengths: raw?.strengths.length ?? 0,
       gaps: raw?.gaps.length ?? 0, suggestions: suggestions.length,
     });
-    if (initialFailure) return deepSeekFailureResponse(initialFailure);
-    return privateJson({
+    if (initialFailure) return done(deepSeekFailureResponse(initialFailure));
+    return done(privateJson({
       error: 'DEEPSEEK_INCOMPLETE_REPORT',
       details: {
         core: Boolean(raw), evidence: evidence.length, verifiedEvidence: evidence.filter((item) => item.resumeEvidence.length).length,
         strengths: raw?.strengths.length ?? 0, gaps: raw?.gaps.length ?? 0, suggestions: suggestions.length,
       },
-    }, { status: 502 });
+    }, { status: 502 }));
   }
 
   const { overall, scoring } = scoreEvidence(evidence);
@@ -337,5 +343,5 @@ export async function POST(request: Request) {
     coveredTerms: raw.strengths.slice(0, 6), missingTerms: raw.gaps.slice(0, 6), evidence,
     metricSignals: metricSignals(resumeText), suggestions,
   };
-  return privateJson({ analysis });
+  return done(privateJson({ analysis }));
 }

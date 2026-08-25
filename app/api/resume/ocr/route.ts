@@ -1,4 +1,5 @@
 import { guardApiRequest, privateJson } from '../../../lib/request-guard';
+import { trackRuntimeResponse } from '../../../lib/runtime-telemetry';
 
 export const runtime = 'nodejs';
 
@@ -35,24 +36,28 @@ function delay(milliseconds: number) {
 }
 
 export async function POST(request: Request) {
-  const blocked = guardApiRequest(request, { bucket: 'resume-ocr', limit: 6, maxBytes: 42 * 1024 * 1024 });
-  if (blocked) return blocked;
-  const apiKey = process.env.ZHIPU_API_KEY?.trim();
+  const startedAt = Date.now();
   const model = process.env.ZHIPU_VISION_MODEL?.trim() || 'glm-4.6v-flash';
-  if (!apiKey) return privateJson({ error: 'OCR_NOT_CONFIGURED' }, { status: 503 });
+  const done = (response: Response) => trackRuntimeResponse(startedAt, {
+    requestType: 'ocr', provider: 'zhipu', model,
+  }, response);
+  const blocked = guardApiRequest(request, { bucket: 'resume-ocr', limit: 6, maxBytes: 42 * 1024 * 1024 });
+  if (blocked) return done(blocked);
+  const apiKey = process.env.ZHIPU_API_KEY?.trim();
+  if (!apiKey) return done(privateJson({ error: 'OCR_NOT_CONFIGURED' }, { status: 503 }));
 
   let body: { images?: unknown; filename?: unknown; language?: unknown };
   try {
     body = await request.json();
   } catch {
-    return privateJson({ error: 'INVALID_REQUEST' }, { status: 400 });
+    return done(privateJson({ error: 'INVALID_REQUEST' }, { status: 400 }));
   }
 
   const images = Array.isArray(body.images)
     ? body.images.filter((item): item is string => typeof item === 'string' && item.length > 0)
     : [];
   if (!images.length || images.length > MAX_IMAGES || images.some((image) => image.length > MAX_IMAGE_LENGTH)) {
-    return privateJson({ error: 'INVALID_IMAGES' }, { status: 400 });
+    return done(privateJson({ error: 'INVALID_IMAGES' }, { status: 400 }));
   }
 
   const outputLanguage = body.language === 'en' ? 'English' : 'Chinese or the source language';
@@ -98,18 +103,18 @@ export async function POST(request: Request) {
       }
       if (!response.ok) {
         const status = response.status === 401 || response.status === 403 ? 401 : response.status === 429 ? 429 : 502;
-        return privateJson({ error: status === 401 ? 'OCR_AUTH' : status === 429 ? 'OCR_RATE_LIMIT' : 'OCR_UPSTREAM' }, { status });
+        return done(privateJson({ error: status === 401 ? 'OCR_AUTH' : status === 429 ? 'OCR_RATE_LIMIT' : 'OCR_UPSTREAM' }, { status }));
       }
 
       const text = cleanExtractedText(readMessageText(payload?.choices?.[0]?.message?.content));
-      if (text.length < 40) return privateJson({ error: 'OCR_EMPTY' }, { status: 422 });
-      return privateJson({ text, model });
+      if (text.length < 40) return done(privateJson({ error: 'OCR_EMPTY' }, { status: 422 }));
+      return done(privateJson({ text, model }));
     }
 
-    return privateJson({ error: 'OCR_RATE_LIMIT' }, { status: 429 });
+    return done(privateJson({ error: 'OCR_RATE_LIMIT' }, { status: 429 }));
   } catch (error) {
     const timedOut = error instanceof Error && error.name === 'AbortError';
-    return privateJson({ error: timedOut ? 'OCR_TIMEOUT' : 'OCR_UPSTREAM' }, { status: timedOut ? 504 : 502 });
+    return done(privateJson({ error: timedOut ? 'OCR_TIMEOUT' : 'OCR_UPSTREAM' }, { status: timedOut ? 504 : 502 }));
   } finally {
     clearTimeout(timeout);
   }
