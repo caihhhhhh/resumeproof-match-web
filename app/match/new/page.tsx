@@ -52,7 +52,7 @@ const copy = {
     ocrNotConfigured: '视觉识别服务尚未配置，请联系网站管理员。', ocrAuth: '视觉识别服务授权异常，请联系网站管理员。', ocrRate: '视觉识别请求过于频繁，请稍后重试。', ocrTimeout: '视觉识别超时，请重新上传。', ocrPageLimit: '扫描 PDF 最多支持 6 页，请上传精简版简历。', ocrFailed: '没有可靠识别出简历文字，请重新上传清晰文件或粘贴文字。',
     resumePlaceholder: '粘贴完整简历内容……', reviewResume: '查看或编辑读取到的简历文字', restoredResume: '已恢复当前标签页中的简历文字',
     jdTitle: '目标岗位', jdBody: '同一个输入框可接收职位链接或完整 JD。', jdPlaceholder: '粘贴职位链接，或直接粘贴职责与任职要求……',
-    parseLink: '读取职位链接', parsingLink: '正在读取…', detected: '已识别来源', linkParsed: '职位内容已读取，请检查原文。', pasteRequired: '该页面无法可靠自动读取，请把完整 JD 粘贴到输入框。',
+    parseLink: '读取职位链接', parsingLink: '正在读取…', detected: '已识别来源', linkParsed: '职位内容已读取，请检查原文。', pasteRequired: '该页面无法可靠自动读取，请把完整 JD 粘贴到输入框。', detailLinkRequired: '请粘贴具体职位详情页链接，而不是搜索结果或职位列表页。',
     invalidUrl: '请输入有效的 HTTPS 招聘链接。', reviewJd: '查看或编辑读取到的 JD 文字', characters: '字符', start: '开始 AI 分析', confirmAndAnalyze: '确认识别文字并分析', analyzing: 'AI 正在分析…', startHint: '点击后，已核对的简历与 JD 文字将发送给 DeepSeek 做语义分析；图片或扫描 PDF 仅在识别时发送给智谱。',
     aiNotConfigured: '分析服务尚未配置，请联系网站管理员。', aiFailed: '分析服务暂时不可用，请稍后重试。', aiAuth: '分析服务授权异常，请联系网站管理员。', aiBalance: '分析服务额度不足，请联系网站管理员。', aiRate: '分析服务请求过于频繁，请稍后重试。', siteRate: '当前设备请求较频繁，请稍后再试。', aiOutput: '完整报告未生成成功，请重新分析。系统不会展示缺少评分、证据或建议的半成品。', aiTimeout: '分析超过 60 秒仍未响应，请重新分析。',
     resultBack: '返回修改材料', matchTitle: '证据先于分数。', matchBody: 'AI 会识别同义表达和可迁移经验，但每项匹配都必须引用真实的简历原句。结果不代表招聘决定。',
@@ -74,7 +74,7 @@ const copy = {
     ocrNotConfigured: 'Visual recognition is not configured. Contact the site administrator.', ocrAuth: 'Visual recognition has an authorization issue. Contact the site administrator.', ocrRate: 'Visual recognition is rate-limited. Try again shortly.', ocrTimeout: 'Visual recognition timed out. Upload the file again.', ocrPageLimit: 'Scanned PDFs can contain up to 6 pages. Upload a shorter resume.', ocrFailed: 'The resume text could not be read reliably. Upload a clearer file or paste the text.',
     resumePlaceholder: 'Paste the complete resume here…', reviewResume: 'Review or edit the extracted resume text', restoredResume: 'Restored text from this browser tab',
     jdTitle: 'Target role', jdBody: 'The same field accepts a job link or the complete JD.', jdPlaceholder: 'Paste a job link or the complete responsibilities and requirements…',
-    parseLink: 'Read job link', parsingLink: 'Reading…', detected: 'Detected source', linkParsed: 'Job content extracted. Review the source text.', pasteRequired: 'This page cannot be read reliably. Paste the complete JD into the field.',
+    parseLink: 'Read job link', parsingLink: 'Reading…', detected: 'Detected source', linkParsed: 'Job content extracted. Review the source text.', pasteRequired: 'This page cannot be read reliably. Paste the complete JD into the field.', detailLinkRequired: 'Paste a specific job-detail URL rather than a search or job-listing page.',
     invalidUrl: 'Enter a valid HTTPS job posting URL.', reviewJd: 'Review or edit the extracted JD text', characters: 'characters', start: 'Start AI analysis', confirmAndAnalyze: 'Confirm extracted text and analyze', analyzing: 'AI is analyzing…', startHint: 'After you click, reviewed resume and JD text is sent to DeepSeek for semantic analysis. Images or scanned PDFs are sent to Zhipu only for recognition.',
     aiNotConfigured: 'The analysis service is not configured. Contact the site administrator.', aiFailed: 'The analysis service is temporarily unavailable. Please try again.', aiAuth: 'The analysis service has an authorization issue. Contact the site administrator.', aiBalance: 'The analysis service has insufficient quota. Contact the site administrator.', aiRate: 'The analysis service is rate-limiting requests. Try again shortly.', siteRate: 'This device has made too many requests. Please try again shortly.', aiOutput: 'The complete report could not be generated. Please retry; incomplete scores, evidence, or suggestions will never be shown.', aiTimeout: 'Analysis did not finish within 60 seconds. Please run it again.',
     resultBack: 'Back to materials', matchTitle: 'Evidence before scores.', matchBody: 'AI can recognize equivalent wording and transferable experience, but every match must cite a real resume excerpt. Results are not hiring decisions.',
@@ -436,14 +436,15 @@ export default function NewMatchPage() {
     trackEvent('jd_link_parse_started', { source });
     try {
       const response = await fetch('/api/jd/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: parsedUrl.toString() }) });
-      const data = (await response.json()) as { status?: string; error?: string; sourceLabel?: string; canonicalUrl?: string; jdText?: string; title?: string; company?: string; location?: string };
+      const data = (await response.json()) as { status?: string; error?: string; code?: string; sourceLabel?: string; canonicalUrl?: string; jdText?: string; title?: string; company?: string; location?: string };
       if (data.sourceLabel) setJdSource(data.sourceLabel);
       if (data.canonicalUrl) setJdEntry(data.canonicalUrl);
       if (data.status === 'success' && data.jdText) {
         setJdText(data.jdText); setJobTitle(data.title ?? ''); setJobCompany(data.company ?? ''); setJobLocation(data.location ?? ''); setJdState('ready'); setJdMessage(t.linkParsed);
         trackEvent('jd_link_parse_completed', { source: data.sourceLabel || source });
-      } else if (data.error === 'SITE_RATE_LIMIT') { setJdState('error'); setJdMessage(t.siteRate); }
-      else { setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: data.error || 'paste_required', source }); }
+      } else if ((data.error || data.code) === 'SITE_RATE_LIMIT') { setJdState('error'); setJdMessage(t.siteRate); }
+      else if (data.code === 'JOB_DETAIL_REQUIRED') { setJdState('paste_required'); setJdMessage(t.detailLinkRequired); trackEvent('jd_link_parse_failed', { reason: data.code, source }); }
+      else { setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: data.error || data.code || 'paste_required', source }); }
     } catch { setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: 'network_error', source }); }
   }
 
