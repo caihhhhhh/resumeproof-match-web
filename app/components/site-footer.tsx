@@ -2,14 +2,15 @@
 
 import Link from 'next/link';
 import { useLanguage } from './language-context';
+import { openAnalyticsSettings } from './google-analytics';
 
 const copy = {
   zh: {
-    about: '关于', privacy: '隐私政策', terms: '使用条款', github: 'GitHub', feedback: '反馈',
+    about: '关于', privacy: '隐私政策', terms: '使用条款', analytics: '分析设置', github: 'GitHub', feedback: '反馈',
     principle: '先核对证据，再修改简历。', disclaimer: 'AI 匹配结果仅供求职决策参考，不代表招聘结果。',
   },
   en: {
-    about: 'About', privacy: 'Privacy', terms: 'Terms', github: 'GitHub', feedback: 'Feedback',
+    about: 'About', privacy: 'Privacy', terms: 'Terms', analytics: 'Analytics settings', github: 'GitHub', feedback: 'Feedback',
     principle: 'Verify the evidence before rewriting.', disclaimer: 'AI match results support job-search decisions; they do not predict hiring outcomes.',
   },
 } as const;
@@ -31,6 +32,7 @@ export function SiteFooter() {
         <Link href="/about">{t.about}</Link>
         <Link href="/privacy">{t.privacy}</Link>
         <Link href="/terms">{t.terms}</Link>
+        <button type="button" onClick={openAnalyticsSettings}>{t.analytics}</button>
         <a href={repository} target="_blank" rel="noreferrer">{t.github}</a>
         <a href={`${repository}/issues`} target="_blank" rel="noreferrer">{t.feedback}</a>
       </nav>
