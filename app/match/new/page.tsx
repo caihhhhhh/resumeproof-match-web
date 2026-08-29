@@ -578,7 +578,9 @@ export default function NewMatchPage() {
 
   async function deleteSavedSample() {
     if (!sampleReference) return;
-    const response = await fetch(`/api/samples/${encodeURIComponent(sampleReference)}`, { method: 'DELETE' });
+    const response = await fetch(`/api/samples/${encodeURIComponent(sampleReference)}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
     if (!response.ok) return;
     setSampleReference('');
     setSampleDeleted(true);
