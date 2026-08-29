@@ -6,6 +6,7 @@ export const PRODUCT_EVENT_NAMES = new Set([
   'resume_upload_started', 'resume_upload_completed', 'resume_upload_failed', 'resume_input_ready',
   'jd_link_parse_started', 'jd_link_parse_completed', 'jd_link_parse_failed', 'jd_input_ready',
   'analysis_started', 'analysis_completed', 'analysis_failed',
+  'result_feedback_submitted',
   'suggestion_reviewed', 'review_draft_built', 'review_draft_confirmed', 'resume_exported',
 ]);
 
@@ -13,6 +14,7 @@ const PROPERTY_KEYS = new Set([
   'source', 'file_type', 'file_size', 'extraction', 'reason', 'method',
   'resume_method', 'jd_method', 'language', 'grade', 'score_band',
   'suggestion_count', 'decision', 'adopted_suggestions', 'template', 'format',
+  'helpful', 'feedback_reason',
 ]);
 
 const PROPERTY_STRING_PATTERN = /^[\p{L}\p{N} ._+&/-]{1,48}$/u;

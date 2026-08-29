@@ -1,6 +1,7 @@
 import { readRuntimeEvents, type RuntimeEventRow, type RuntimeRequestType } from './runtime-telemetry';
 import { readContentSamples } from './content-samples';
 import { readProductEvents, type ProductEventRow } from './product-events';
+import { readFeedbackEvents, type FeedbackEventRow } from './feedback-events';
 
 export type AdminRangeKey = '24h' | '7d' | '30d';
 
@@ -12,6 +13,13 @@ export type ProductAnalyticsSnapshot = {
     suggestionAcceptanceRate: number | null;
     analysisFailures: number;
   };
+};
+
+export type FeedbackSnapshot = {
+  total: number;
+  helpful: number;
+  helpfulRate: number | null;
+  reasons: Array<{ key: string; label: string; count: number }>;
 };
 
 export type AdminRuntimeSnapshot = {
@@ -26,6 +34,7 @@ export type AdminRuntimeSnapshot = {
 export type AdminRuntimeData = {
   ranges: Record<AdminRangeKey, AdminRuntimeSnapshot>;
   productRanges: Record<AdminRangeKey, ProductAnalyticsSnapshot>;
+  feedbackRanges: Record<AdminRangeKey, FeedbackSnapshot>;
   hasData: boolean;
   samples: Array<{
     reference: string;
@@ -207,12 +216,36 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
   };
 }
 
+const feedbackReasonLabels: Record<string, string> = {
+  score_unfair: '评分不合理',
+  evidence_missed: '漏掉已有经历',
+  suggestions_weak: '建议不实用',
+  unclear: '解释不清楚',
+  other: '其他',
+};
+
+function buildFeedbackSnapshot(rows: FeedbackEventRow[], now: number, windowMs: number): FeedbackSnapshot {
+  const current = rows.filter((row) => row.occurred_at_ms >= now - windowMs);
+  const helpful = current.filter((row) => row.helpful === 1).length;
+  const reasonCounts = current.filter((row) => row.helpful === 0).reduce<Record<string, number>>((counts, row) => {
+    counts[row.reason] = (counts[row.reason] ?? 0) + 1;
+    return counts;
+  }, {});
+  return {
+    total: current.length,
+    helpful,
+    helpfulRate: percent(helpful, current.length),
+    reasons: Object.entries(feedbackReasonLabels).map(([key, label]) => ({ key, label, count: reasonCounts[key] ?? 0 })),
+  };
+}
+
 export async function getAdminRuntimeData(): Promise<AdminRuntimeData> {
   const now = Date.now();
-  const [rows, sampleRows, productRows] = await Promise.all([
+  const [rows, sampleRows, productRows, feedbackRows] = await Promise.all([
     readRuntimeEvents(now - 60 * 24 * 60 * 60_000),
     readContentSamples(),
     readProductEvents(now - 60 * 24 * 60 * 60_000),
+    readFeedbackEvents(now - 60 * 24 * 60 * 60_000),
   ]);
   const latestSuccess = (provider: string) => rows.find((row) => row.provider === provider && row.status === 'success')?.occurred_at_ms ?? null;
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? '';
@@ -227,7 +260,12 @@ export async function getAdminRuntimeData(): Promise<AdminRuntimeData> {
       '7d': buildProductSnapshot(productRows, now, 7 * 24 * 60 * 60_000),
       '30d': buildProductSnapshot(productRows, now, 30 * 24 * 60 * 60_000),
     },
-    hasData: rows.length > 0,
+    feedbackRanges: {
+      '24h': buildFeedbackSnapshot(feedbackRows, now, 24 * 60 * 60_000),
+      '7d': buildFeedbackSnapshot(feedbackRows, now, 7 * 24 * 60 * 60_000),
+      '30d': buildFeedbackSnapshot(feedbackRows, now, 30 * 24 * 60 * 60_000),
+    },
+    hasData: rows.length > 0 || productRows.length > 0 || feedbackRows.length > 0,
     samples: sampleRows.map((row) => ({
       reference: row.public_id,
       time: row.occurred_at_ms,

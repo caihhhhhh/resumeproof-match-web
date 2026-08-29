@@ -41,6 +41,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
   const [search, setSearch] = useState('');
   const snapshot = runtimeData.ranges[range];
   const productSnapshot = runtimeData.productRanges[range];
+  const feedbackSnapshot = runtimeData.feedbackRanges[range];
   const productStepMax = Math.max(1, ...productSnapshot.steps.map((step) => step.count));
 
   useGSAP(() => {
@@ -166,8 +167,8 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
               ))}
             </div>
             <div className="admin-product-quality">
-              <div><span>分析成功率</span><b>{productSnapshot.quality.analysisSuccessRate === null ? '—' : `${productSnapshot.quality.analysisSuccessRate.toFixed(1)}%`}</b></div>
-              <div><span>建议采用率</span><b>{productSnapshot.quality.suggestionAcceptanceRate === null ? '—' : `${productSnapshot.quality.suggestionAcceptanceRate.toFixed(1)}%`}</b></div>
+              <div><span>分析成功率</span><b>{productSnapshot.quality.analysisSuccessRate === null ? '-' : `${productSnapshot.quality.analysisSuccessRate.toFixed(1)}%`}</b></div>
+              <div><span>建议采用率</span><b>{productSnapshot.quality.suggestionAcceptanceRate === null ? '-' : `${productSnapshot.quality.suggestionAcceptanceRate.toFixed(1)}%`}</b></div>
               <div><span>分析失败事件</span><b>{productSnapshot.quality.analysisFailures}</b></div>
             </div>
           </article>
@@ -190,7 +191,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
               {snapshot.pipeline.map((item) => (
                 <div key={item.label}>
                   <span>{item.label} · {item.total} 次</span>
-                  <strong>{item.successRate === null ? '—' : `${item.successRate.toFixed(1)}%`}</strong>
+                  <strong>{item.successRate === null ? '-' : `${item.successRate.toFixed(1)}%`}</strong>
                   <i style={{ '--fill': `${item.successRate ?? 0}%` } as React.CSSProperties} />
                 </div>
               ))}
@@ -264,8 +265,11 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
 
         <section className="admin-grid-row admin-bottom-row" id="feedback">
           <article className="admin-panel admin-feedback-panel">
-            <div className="admin-panel-head"><div><h2>用户反馈</h2><p>只有实际收集后才展示评分，不用示例数字占位。</p></div><strong>—</strong></div>
-            <div className="admin-empty-state admin-feedback-empty">当前尚未接入用户反馈采集。运行数据与用户主观评价会保持分开。</div>
+            <div className="admin-panel-head"><div><h2>用户反馈</h2><p>匿名反馈与运行事件分开统计，不保存简历或 JD 内容。</p></div><strong>{feedbackSnapshot.helpfulRate === null ? '-' : `${feedbackSnapshot.helpfulRate.toFixed(0)}%`}</strong></div>
+            {feedbackSnapshot.total ? <>
+              <div className="admin-feedback-summary"><span><b>{feedbackSnapshot.helpful}</b><small>认为有帮助</small></span><span><b>{feedbackSnapshot.total}</b><small>反馈总数</small></span></div>
+              <div className="admin-feedback-list">{feedbackSnapshot.reasons.map((reason) => <div key={reason.key}><span>{reason.label}</span><div><i style={{ width: `${feedbackSnapshot.total ? reason.count / feedbackSnapshot.total * 100 : 0}%` }} /></div><b>{reason.count}</b></div>)}</div>
+            </> : <div className="admin-empty-state admin-feedback-empty">暂无反馈。首条真实反馈提交后，这里会自动显示有用率和问题分布。</div>}
           </article>
 
           <article className="admin-panel admin-settings-panel" id="settings">

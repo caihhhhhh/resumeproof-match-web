@@ -14,6 +14,7 @@ type Screen = 'materials' | 'results' | 'review';
 type InputMode = 'upload' | 'paste';
 type ParseState = 'idle' | 'working' | 'ready' | 'paste_required' | 'error';
 type ReviewMode = 'preview' | 'edit';
+type FeedbackReason = 'helpful' | 'score_unfair' | 'evidence_missed' | 'suggestions_weak' | 'unclear' | 'other';
 
 const ACCEPTED_RESUME_EXTENSIONS = new Set([
   'pdf', 'docx', 'txt', 'md', 'png', 'jpg', 'jpeg', 'webp',
@@ -58,9 +59,10 @@ const copy = {
     aiNotConfigured: '分析服务尚未配置，请联系网站管理员。', aiFailed: '分析服务暂时不可用，请稍后重试。', aiAuth: '分析服务授权异常，请联系网站管理员。', aiBalance: '分析服务额度不足，请联系网站管理员。', aiRate: '分析服务请求过于频繁，请稍后重试。', siteRate: '当前设备请求较频繁，请稍后再试。', aiOutput: '完整报告未生成成功，请重新分析。系统不会展示缺少评分、证据或建议的半成品。', aiTimeout: '分析超过 60 秒仍未响应，请重新分析。',
     resultBack: '返回修改材料', matchTitle: '证据先于分数。', matchBody: 'AI 会识别同义表达和可迁移经验，但每项匹配都必须引用真实的简历原句。结果不代表招聘决定。',
     scoreLabel: '证据匹配度', gradeA: '值得投递', gradeB: '有条件投递', gradeC: '证据不足', scoreMethod: '必须项、重要项、加分项分别按 3、2、1 权重计算；存在关键必须项缺口时不会标记为“值得投递”。', mustCoverage: '必须项覆盖', importantCoverage: '重要项覆盖', bonusCoverage: '加分项覆盖', verifiedCoverage: '原句核验率', mustNote: '对最终判断影响最大', importantNote: '影响岗位胜任度', bonusNote: '不满足通常不构成淘汰', verifiedNote: '匹配项中可核对简历原句的比例',
-    evidenceTitle: 'JD 要求与简历证据', evidenceBody: '先看原句，再看简历中是否有语义对应且可核对的证据。',
+    evidenceTitle: 'JD 要求与简历证据', evidenceBody: '先看原句，再看简历中是否有语义对应且可核对的证据。', nextFocusTitle: '先处理这些关键差距', nextFocusEmpty: '当前没有高优先级证据缺口，可以直接审核改写建议。',
     statusStrong: '已证实', statusPartial: '部分证据', statusGap: '尚无证据', noMatchedTerms: '暂无可核对原句', coveredTitle: '已有优势', missingTitle: '优先补证',
     missingAdvice: '只补充真实做过的项目、动作或结果；没有经历就保留为差距。', metricSignals: '份量化结果已识别', localRules: 'AI 语义诊断 · 原句证据校验', evidenceQuote: '简历证据', whyMatch: '判断依据',
+    feedbackTitle: '这份分析对你有帮助吗？', feedbackBody: '只记录选择，不记录简历或 JD 内容。', feedbackYes: '有帮助', feedbackNo: '不太准', feedbackWhy: '主要问题是', feedbackThanks: '收到，感谢你的反馈。', feedbackError: '暂时无法提交，请稍后再试。', feedbackScore: '评分不合理', feedbackEvidence: '漏掉已有经历', feedbackSuggestions: '建议不实用', feedbackUnclear: '解释不清楚', feedbackOther: '其他',
     reviewEyebrow: '完整文字审核稿', reviewTitle: '读顺全文，选好版式再导出。', reviewBody: '这里只合并你明确采用的建议。你可以继续编辑全文和切换版式；确认前不会创建任何文件。', reviewChanges: '本轮已采用修改', reviewOriginal: '原文', reviewFinal: '审核稿', reviewCharacters: '字符', reviewWarning: '请重点核对公司、职位、日期、数字和专有名词。确认文字稿后，本页会立即开放 HTML 与 PDF 导出。', reviewBack: '返回建议审核', reviewNext: '确认并锁定文字稿', reviewPreview: '排版预览', reviewEdit: '编辑文字', reviewPreviewHint: '预览只调整视觉层级与空白，不改变审核稿内容。', reviewNoChanges: '本轮没有采用 AI 改写，当前显示原始简历全文。', reviewCanvas: '文字排版预览',
     confirmedEyebrow: '文字审核已完成', confirmedTitle: '这份文字稿已锁定。', confirmedBody: '系统保存了当前全文快照。返回修改任何文字后，本次确认会自动失效；此操作不会生成 HTML、PDF 或其他文件。', confirmedSnapshot: '已确认全文', confirmedChanges: '采用修改', confirmedTime: '确认时间', confirmedEdit: '返回继续编辑', confirmedNext: '选择简历模板', confirmedNextHint: '先选择版式，不会立即生成文件。',
     templateEyebrow: '选择版式', templateTitle: '内容不变，只调整阅读节奏。', templateBody: '三个模板共用已确认文字。切换模板不会重写内容，也不会影响匹配报告。', templateBalanced: '均衡单栏', templateBalancedBody: '清晰分区与舒适行距，适合大多数岗位。', templateCompact: '紧凑单栏', templateCompactBody: '缩小段间距，适合经历较多或希望控制页数的简历。', templateMinimal: '极简单栏', templateMinimalBody: '弱化颜色和边框，让公司、岗位与成果成为重点。', templateSelected: '已选择', templateBack: '返回确认记录', templateContinue: '进入最终预览',
@@ -80,9 +82,10 @@ const copy = {
     aiNotConfigured: 'The analysis service is not configured. Contact the site administrator.', aiFailed: 'The analysis service is temporarily unavailable. Please try again.', aiAuth: 'The analysis service has an authorization issue. Contact the site administrator.', aiBalance: 'The analysis service has insufficient quota. Contact the site administrator.', aiRate: 'The analysis service is rate-limiting requests. Try again shortly.', siteRate: 'This device has made too many requests. Please try again shortly.', aiOutput: 'The complete report could not be generated. Please retry; incomplete scores, evidence, or suggestions will never be shown.', aiTimeout: 'Analysis did not finish within 60 seconds. Please run it again.',
     resultBack: 'Back to materials', matchTitle: 'Evidence before scores.', matchBody: 'AI can recognize equivalent wording and transferable experience, but every match must cite a real resume excerpt. Results are not hiring decisions.',
     scoreLabel: 'Evidence match', gradeA: 'Pursue', gradeB: 'Conditional fit', gradeC: 'Evidence gap', scoreMethod: 'Must-have, important, and bonus requirements use 3:2:1 weights. A critical must-have gap prevents a “Pursue” recommendation.', mustCoverage: 'Must-have coverage', importantCoverage: 'Important coverage', bonusCoverage: 'Bonus coverage', verifiedCoverage: 'Source verification', mustNote: 'Largest impact on the final score', importantNote: 'Material to role readiness', bonusNote: 'Usually not disqualifying', verifiedNote: 'Share of mappings backed by exact resume excerpts',
-    evidenceTitle: 'JD requirements and resume evidence', evidenceBody: 'Start from each requirement, then verify whether the resume contains semantically relevant source evidence.',
+    evidenceTitle: 'JD requirements and resume evidence', evidenceBody: 'Start from each requirement, then verify whether the resume contains semantically relevant source evidence.', nextFocusTitle: 'Fix these evidence gaps first', nextFocusEmpty: 'No high-priority evidence gap was found. You can review the rewrite suggestions next.',
     statusStrong: 'Supported', statusPartial: 'Partial evidence', statusGap: 'No evidence yet', noMatchedTerms: 'No verified excerpt yet', coveredTitle: 'Current strengths', missingTitle: 'Evidence to add first',
     missingAdvice: 'Add only projects, actions, or outcomes you actually have. If the experience does not exist, keep it as a gap.', metricSignals: 'quantified results detected', localRules: 'AI semantic diagnostic · source evidence verified', evidenceQuote: 'Resume evidence', whyMatch: 'Reasoning',
+    feedbackTitle: 'Was this analysis useful?', feedbackBody: 'Only your selection is stored. Resume and JD content are not included.', feedbackYes: 'Useful', feedbackNo: 'Not accurate', feedbackWhy: 'Main issue', feedbackThanks: 'Thanks, your feedback was received.', feedbackError: 'Feedback could not be submitted. Try again later.', feedbackScore: 'Score feels wrong', feedbackEvidence: 'Missed existing evidence', feedbackSuggestions: 'Suggestions are weak', feedbackUnclear: 'Explanation is unclear', feedbackOther: 'Other',
     reviewEyebrow: 'Full text review', reviewTitle: 'Read it through, choose a layout, then export.', reviewBody: 'Only suggestions you explicitly adopted are merged here. Keep editing or switch layouts; no file is created before confirmation.', reviewChanges: 'Adopted changes', reviewOriginal: 'Original', reviewFinal: 'Review draft', reviewCharacters: 'characters', reviewWarning: 'Verify company names, titles, dates, metrics, and proper nouns. Confirming the text unlocks HTML and PDF export on this page.', reviewBack: 'Back to suggestions', reviewNext: 'Confirm and lock text', reviewPreview: 'Layout preview', reviewEdit: 'Edit text', reviewPreviewHint: 'The preview changes hierarchy and spacing only. Draft content stays unchanged.', reviewNoChanges: 'No AI rewrite was adopted. The original resume is shown in full.', reviewCanvas: 'Text layout preview',
     confirmedEyebrow: 'Text review complete', confirmedTitle: 'This draft is now locked.', confirmedBody: 'The complete text snapshot has been saved. Editing any text will invalidate this confirmation. No HTML, PDF, or other file is created here.', confirmedSnapshot: 'Confirmed text', confirmedChanges: 'adopted changes', confirmedTime: 'Confirmed at', confirmedEdit: 'Return to edit', confirmedNext: 'Choose a template', confirmedNextHint: 'Choose the layout first. No file is generated yet.',
     templateEyebrow: 'Choose a layout', templateTitle: 'Keep the content. Change the reading rhythm.', templateBody: 'All three templates use the confirmed text. Switching layouts does not rewrite the resume or change the match report.', templateBalanced: 'Balanced single column', templateBalancedBody: 'Clear sections and comfortable spacing for most roles.', templateCompact: 'Compact single column', templateCompactBody: 'Tighter spacing for longer resumes or stricter page limits.', templateMinimal: 'Minimal single column', templateMinimalBody: 'Less color and fewer rules, with focus on roles and outcomes.', templateSelected: 'Selected', templateBack: 'Back to confirmation', templateContinue: 'Open final preview',
@@ -310,6 +313,8 @@ export default function NewMatchPage() {
   const [sampleConsent, setSampleConsent] = useState(false);
   const [sampleReference, setSampleReference] = useState('');
   const [sampleDeleted, setSampleDeleted] = useState(false);
+  const [feedbackIntent, setFeedbackIntent] = useState<'idle' | 'negative'>('idle');
+  const [feedbackState, setFeedbackState] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
   const resumeReadyTracked = useRef(false);
   const jdReadyTracked = useRef(false);
 
@@ -476,6 +481,10 @@ export default function NewMatchPage() {
   const looksLikeUrl = /^https?:\/\//i.test(jdEntry.trim());
   const statusCopy: Record<EvidenceStatus, string> = { strong: t.statusStrong, partial: t.statusPartial, gap: t.statusGap };
   const gradeCopy = analysis ? { A: t.gradeA, B: t.gradeB, C: t.gradeC }[analysis.grade] : '';
+  const priorityEvidence = analysis?.evidence
+    .filter((item) => item.status !== 'strong' && item.importance !== 'bonus')
+    .sort((a, b) => (a.importance === 'must' ? 0 : 1) - (b.importance === 'must' ? 0 : 1))
+    .slice(0, 3) ?? [];
   const adoptedSuggestions = analysis?.suggestions.filter((item) => suggestionDecisions[item.id] === 'accepted') ?? [];
   const reviewPreviewBlocks = useMemo(() => parseReviewBlocks(reviewDraft), [reviewDraft]);
   const confirmedPreviewBlocks = useMemo(() => parseReviewBlocks(confirmedDraft), [confirmedDraft]);
@@ -584,7 +593,7 @@ export default function NewMatchPage() {
         trackEvent('analysis_failed', { reason: (data.error || 'invalid_report').slice(0, 36) });
         setAnalysisState('error'); return;
       }
-      setResumeNeedsReview(false); setAnalysis(data.analysis); setAnalysisState('idle'); setSampleReference(typeof data.sampleReference === 'string' ? data.sampleReference : ''); setSampleDeleted(false); setScreen('results');
+      setResumeNeedsReview(false); setAnalysis(data.analysis); setAnalysisState('idle'); setSampleReference(typeof data.sampleReference === 'string' ? data.sampleReference : ''); setSampleDeleted(false); setFeedbackIntent('idle'); setFeedbackState('idle'); setScreen('results');
       trackEvent('analysis_completed', { grade: data.analysis.grade, score_band: `${Math.floor(data.analysis.overall / 10) * 10}s`, suggestion_count: data.analysis.suggestions.length });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
@@ -602,6 +611,28 @@ export default function NewMatchPage() {
     if (!response.ok) return;
     setSampleReference('');
     setSampleDeleted(true);
+  }
+
+  async function submitFeedback(helpful: boolean, reason: FeedbackReason) {
+    if (!analysis || feedbackState === 'submitting' || feedbackState === 'submitted') return;
+    setFeedbackState('submitting');
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          helpful,
+          reason,
+          grade: analysis.grade,
+          scoreBand: `${Math.floor(analysis.overall / 10) * 10}s`,
+        }),
+      });
+      if (!response.ok) throw new Error('feedback_failed');
+      setFeedbackState('submitted');
+      trackEvent('result_feedback_submitted', { helpful, feedback_reason: reason });
+    } catch {
+      setFeedbackState('error');
+    }
   }
 
   return (
@@ -664,18 +695,29 @@ export default function NewMatchPage() {
       ) : screen === 'results' && analysis ? (
         <section className="match-workbench" aria-labelledby="match-workbench-title">
           <div className="results-toolbar"><button type="button" onClick={() => setScreen('materials')}><span aria-hidden="true">←</span>{t.resultBack}</button><small>{t.localRules}</small></div>
-          <header className="workbench-heading"><div><h1 id="match-workbench-title">{t.matchTitle}</h1><p>{t.matchBody}</p><blockquote className="analysis-summary">{analysis.summary}</blockquote></div></header>
+          <header className="workbench-heading"><div><h1 id="match-workbench-title">{t.matchTitle}</h1><p>{t.matchBody}</p></div></header>
           {(sampleReference || sampleDeleted) && <div className="sample-receipt"><span>{sampleDeleted ? t.sampleDeleted : `${t.sampleSaved} · ${sampleReference.slice(0, 8)}`}</span>{sampleReference && <button type="button" onClick={deleteSavedSample}>{t.sampleDelete}</button>}</div>}
-          <div className="diagnostic-grid">
-            <article className={`score-panel grade-${analysis.grade.toLowerCase()}`}><span>{t.scoreLabel}</span><small className="score-method">{t.scoreMethod}</small><strong>{analysis.overall}<small>/100</small></strong><p>{gradeCopy}</p></article>
-            <div className="dimension-panel">{[
+          <div className="result-decision-grid">
+            <article className={`result-verdict grade-${analysis.grade.toLowerCase()}`}><div><span>{t.scoreLabel}</span><strong>{analysis.overall}<small>/100</small></strong><b>{gradeCopy}</b></div><blockquote>{analysis.summary}</blockquote><small>{t.scoreMethod}</small></article>
+            <article className="result-priorities"><h2>{t.nextFocusTitle}</h2>{priorityEvidence.length ? <ol>{priorityEvidence.map((item) => <li key={item.requirement}><span>{item.importance}</span><p>{item.requirement}</p></li>)}</ol> : <p className="priority-empty">{t.nextFocusEmpty}</p>}</article>
+          </div>
+          <div className="result-dimensions">{[
               { label: t.mustCoverage, value: analysis.scoring.mustCoverage, note: t.mustNote },
               { label: t.importantCoverage, value: analysis.scoring.importantCoverage, note: t.importantNote },
               { label: t.verifiedCoverage, value: analysis.scoring.verifiedEvidence, note: `${t.verifiedNote} · ${analysis.scoring.totalRequirements}` },
-            ].map((dimension) => <article key={dimension.label}><header><span>{dimension.label}</span><b>{dimension.value === null ? '-' : `${dimension.value}%`}</b></header><p className="dimension-reason">{dimension.note}</p></article>)}</div>
-          </div>
+            ].map((dimension) => <article key={dimension.label}><header><span>{dimension.label}</span><b>{dimension.value === null ? '-' : `${dimension.value}%`}</b></header><p>{dimension.note}</p></article>)}</div>
           <div className="signal-grid"><section><h2>{t.coveredTitle}</h2><div className="term-cloud">{analysis.coveredTerms.map((term) => <span key={term}>{term}</span>)}</div></section><section className="missing-signals"><h2>{t.missingTitle}</h2><div className="term-cloud">{analysis.missingTerms.map((term) => <span key={term}>{term}</span>)}</div><p>{t.missingAdvice}</p></section></div>
           <details className="evidence-section"><summary><div><h2>{t.evidenceTitle}</h2><p>{t.evidenceBody}</p></div><span>{analysis.evidence.length}</span></summary><div className="evidence-list">{analysis.evidence.map((item, index) => <article key={`${item.requirement}-${index}`}><div className="evidence-topline"><span className={`evidence-status status-${item.status}`}>{statusCopy[item.status]}</span><small>{item.importance}</small></div><p className="evidence-requirement">{item.requirement}</p>{item.resumeEvidence.length ? <blockquote><span>{t.evidenceQuote}</span>{item.resumeEvidence.join(' / ')}</blockquote> : <small>{t.noMatchedTerms}</small>}<p className="evidence-rationale"><span>{t.whyMatch}</span>{item.rationale}</p></article>)}</div></details>
+          <section className="result-feedback" aria-labelledby="result-feedback-title">
+            <div><h2 id="result-feedback-title">{t.feedbackTitle}</h2><p>{t.feedbackBody}</p></div>
+            {feedbackState === 'submitted' ? <p className="feedback-thanks" role="status">{t.feedbackThanks}</p> : <div className="feedback-control">
+              <div className="feedback-primary"><button type="button" disabled={feedbackState === 'submitting'} onClick={() => submitFeedback(true, 'helpful')}>{t.feedbackYes}</button><button type="button" aria-expanded={feedbackIntent === 'negative'} disabled={feedbackState === 'submitting'} onClick={() => { setFeedbackIntent('negative'); setFeedbackState('idle'); }}>{t.feedbackNo}</button></div>
+              {feedbackIntent === 'negative' && <div className="feedback-reasons"><span>{t.feedbackWhy}</span>{([
+                ['score_unfair', t.feedbackScore], ['evidence_missed', t.feedbackEvidence], ['suggestions_weak', t.feedbackSuggestions], ['unclear', t.feedbackUnclear], ['other', t.feedbackOther],
+              ] as Array<[FeedbackReason, string]>).map(([reason, label]) => <button key={reason} type="button" disabled={feedbackState === 'submitting'} onClick={() => submitFeedback(false, reason)}>{label}</button>)}</div>}
+              {feedbackState === 'error' && <p className="feedback-error" role="alert">{t.feedbackError}</p>}
+            </div>}
+          </section>
           <OptimizationReview analysis={analysis} language={language} decisions={suggestionDecisions} notes={suggestionNotes} onDecision={(id, decision) => { setSuggestionDecisions((current) => ({ ...current, [id]: decision })); trackEvent('suggestion_reviewed', { decision }); }} onNote={(id, note) => setSuggestionNotes((current) => ({ ...current, [id]: note }))} onBack={() => setScreen('materials')} onBuildDraft={buildTextReview} />
         </section>
       ) : screen === 'review' && analysis ? (
