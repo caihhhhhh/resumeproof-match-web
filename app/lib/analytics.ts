@@ -3,11 +3,7 @@
 type AnalyticsValue = string | number | boolean;
 
 export function trackEvent(name: string, parameters: Record<string, AnalyticsValue> = {}) {
-  if (
-    typeof window === 'undefined'
-    || window.localStorage.getItem('resumeproof-analytics-consent') !== 'granted'
-    || typeof window.gtag !== 'function'
-  ) return;
+  if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
   window.gtag('event', name, parameters);
 }
 
