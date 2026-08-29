@@ -1,7 +1,18 @@
 import { readRuntimeEvents, type RuntimeEventRow, type RuntimeRequestType } from './runtime-telemetry';
 import { readContentSamples } from './content-samples';
+import { readProductEvents, type ProductEventRow } from './product-events';
 
 export type AdminRangeKey = '24h' | '7d' | '30d';
+
+export type ProductAnalyticsSnapshot = {
+  kpis: Array<{ label: string; value: string; note: string }>;
+  steps: Array<{ key: string; label: string; count: number }>;
+  quality: {
+    analysisSuccessRate: number | null;
+    suggestionAcceptanceRate: number | null;
+    analysisFailures: number;
+  };
+};
 
 export type AdminRuntimeSnapshot = {
   label: string;
@@ -14,6 +25,7 @@ export type AdminRuntimeSnapshot = {
 
 export type AdminRuntimeData = {
   ranges: Record<AdminRangeKey, AdminRuntimeSnapshot>;
+  productRanges: Record<AdminRangeKey, ProductAnalyticsSnapshot>;
   hasData: boolean;
   samples: Array<{
     reference: string;
@@ -154,11 +166,53 @@ function buildSnapshot(rows: RuntimeEventRow[], now: number, windowMs: number, l
   };
 }
 
+function productProperties(row: ProductEventRow) {
+  try { return JSON.parse(row.properties_json) as Record<string, unknown>; } catch { return {}; }
+}
+
+function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: number): ProductAnalyticsSnapshot {
+  const current = rows.filter((row) => row.occurred_at_ms >= now - windowMs);
+  const count = (eventName: string, predicate?: (row: ProductEventRow) => boolean) => current
+    .filter((row) => row.event_name === eventName && (!predicate || predicate(row))).length;
+  const workspaceViews = count('page_view', (row) => row.page_path === '/match/new');
+  const analysisStarts = count('analysis_started');
+  const analysisCompleted = count('analysis_completed');
+  const analysisFailures = count('analysis_failed');
+  const exports = count('resume_exported');
+  const suggestionReviews = current.filter((row) => row.event_name === 'suggestion_reviewed');
+  const acceptedSuggestions = suggestionReviews.filter((row) => productProperties(row).decision === 'accepted').length;
+  const analysisAttempts = analysisCompleted + analysisFailures;
+
+  return {
+    kpis: [
+      { label: '匹配页访问', value: String(workspaceViews), note: '页面访问事件' },
+      { label: '发起分析', value: String(analysisStarts), note: '点击分析事件' },
+      { label: '分析完成', value: String(analysisCompleted), note: '完整结果返回' },
+      { label: '导出动作', value: String(exports), note: 'HTML 与打印合计' },
+    ],
+    steps: [
+      { key: 'workspace', label: '进入匹配页', count: workspaceViews },
+      { key: 'resume', label: '简历材料就绪', count: count('resume_input_ready') },
+      { key: 'jd', label: 'JD 材料就绪', count: count('jd_input_ready') },
+      { key: 'analysis_start', label: '开始 AI 分析', count: analysisStarts },
+      { key: 'analysis_complete', label: '获得完整结果', count: analysisCompleted },
+      { key: 'review_confirm', label: '确认审核稿', count: count('review_draft_confirmed') },
+      { key: 'export', label: '导出简历', count: exports },
+    ],
+    quality: {
+      analysisSuccessRate: percent(analysisCompleted, analysisAttempts),
+      suggestionAcceptanceRate: percent(acceptedSuggestions, suggestionReviews.length),
+      analysisFailures,
+    },
+  };
+}
+
 export async function getAdminRuntimeData(): Promise<AdminRuntimeData> {
   const now = Date.now();
-  const [rows, sampleRows] = await Promise.all([
+  const [rows, sampleRows, productRows] = await Promise.all([
     readRuntimeEvents(now - 60 * 24 * 60 * 60_000),
     readContentSamples(),
+    readProductEvents(now - 60 * 24 * 60 * 60_000),
   ]);
   const latestSuccess = (provider: string) => rows.find((row) => row.provider === provider && row.status === 'success')?.occurred_at_ms ?? null;
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? '';
@@ -167,6 +221,11 @@ export async function getAdminRuntimeData(): Promise<AdminRuntimeData> {
       '24h': buildSnapshot(rows, now, 24 * 60 * 60_000, '最近 24 小时'),
       '7d': buildSnapshot(rows, now, 7 * 24 * 60 * 60_000, '最近 7 天'),
       '30d': buildSnapshot(rows, now, 30 * 24 * 60 * 60_000, '最近 30 天'),
+    },
+    productRanges: {
+      '24h': buildProductSnapshot(productRows, now, 24 * 60 * 60_000),
+      '7d': buildProductSnapshot(productRows, now, 7 * 24 * 60 * 60_000),
+      '30d': buildProductSnapshot(productRows, now, 30 * 24 * 60 * 60_000),
     },
     hasData: rows.length > 0,
     samples: sampleRows.map((row) => ({

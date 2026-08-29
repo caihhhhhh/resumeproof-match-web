@@ -118,6 +118,30 @@ a { color: inherit; text-decoration: none; }
 .admin-quality-summary span { display: block; color: var(--admin-quiet); font-size: 9px; }
 .admin-quality-summary b { display: block; margin-top: 7px; font-size: 13px; font-weight: 600; }
 .admin-count { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: #ffe1d8; color: #9f3f25; font-family: var(--font-geist-mono), monospace; font-size: 10px; }
+.admin-product-row { grid-template-columns: minmax(0, 8.5fr) minmax(300px, 3.5fr); }
+.admin-product-kpis { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--admin-line); }
+.admin-product-kpis > div { padding: 20px 24px; border-right: 1px solid var(--admin-line); }
+.admin-product-kpis > div:last-child { border-right: 0; }
+.admin-product-kpis span, .admin-product-kpis small { display: block; color: var(--admin-quiet); font-size: 9px; }
+.admin-product-kpis strong { display: block; margin: 10px 0 5px; font-size: 27px; font-weight: 540; letter-spacing: -.05em; }
+.admin-product-funnel { display: grid; padding: 12px 25px; }
+.admin-product-funnel > div { display: grid; grid-template-columns: 30px 150px minmax(80px, 1fr) 42px; align-items: center; gap: 12px; min-height: 42px; }
+.admin-product-funnel > div > span { color: var(--admin-quiet); font-family: var(--font-geist-mono), monospace; font-size: 8px; }
+.admin-product-funnel b { font-size: 10px; font-weight: 570; }
+.admin-product-funnel i { height: 5px; overflow: hidden; background: #e1e4de; }
+.admin-product-funnel em { display: block; min-width: 2px; height: 100%; background: var(--admin-blue); }
+.admin-product-funnel strong { font-family: var(--font-geist-mono), monospace; font-size: 10px; text-align: right; }
+.admin-product-quality { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--admin-line); background: #f2f3ef; }
+.admin-product-quality > div { padding: 16px 24px; border-right: 1px solid var(--admin-line); }
+.admin-product-quality > div:last-child { border-right: 0; }
+.admin-product-quality span { display: block; color: var(--admin-quiet); font-size: 9px; }
+.admin-product-quality b { display: block; margin-top: 7px; font-size: 13px; }
+.admin-key-event-list { display: grid; padding: 8px 24px; }
+.admin-key-event-list > div { display: grid; gap: 6px; padding: 17px 0; border-bottom: 1px solid var(--admin-line); }
+.admin-key-event-list > div:last-child { border-bottom: 0; }
+.admin-key-event-list code { color: var(--admin-blue); font: 9px var(--font-geist-mono), monospace; }
+.admin-key-event-list span { color: #444a52; font-size: 10px; }
+.admin-key-events-panel > p { margin: 0; padding: 18px 24px; border-top: 1px solid var(--admin-line); color: var(--admin-quiet); font-size: 9px; line-height: 1.65; }
 .admin-incident-stack { padding: 0 24px; }
 .admin-incident { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 21px 0; border-bottom: 1px solid var(--admin-line); }
 .admin-incident:last-child { border-bottom: 0; }
@@ -255,6 +279,12 @@ a { color: inherit; text-decoration: none; }
   .admin-top-actions { width: 100%; justify-content: space-between; }
   .admin-kpi-card { grid-column: span 12; min-height: 160px; }
   .admin-pipeline { grid-template-columns: repeat(2, 1fr); gap: 24px 0; }
+  .admin-product-kpis { grid-template-columns: repeat(2, 1fr); }
+  .admin-product-kpis > div:nth-child(2) { border-right: 0; }
+  .admin-product-kpis > div:nth-child(-n+2) { border-bottom: 1px solid var(--admin-line); }
+  .admin-product-funnel > div { grid-template-columns: 24px 120px minmax(60px, 1fr) 32px; }
+  .admin-product-quality { grid-template-columns: 1fr; }
+  .admin-product-quality > div { border-right: 0; border-bottom: 1px solid var(--admin-line); }
   .admin-pipeline > div:nth-child(3) { padding-left: 0; border-left: 0; }
   .admin-quality-summary { grid-template-columns: 1fr; }.admin-quality-summary div { border-right: 0; border-bottom: 1px solid var(--admin-line); }
   .admin-request-head { align-items: flex-start; flex-direction: column; }.admin-search, .admin-search input { width: 100%; }

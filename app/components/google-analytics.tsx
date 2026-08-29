@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useLanguage } from './language-context';
+import { trackEvent } from '../lib/analytics';
 
 declare global {
   interface Window {
@@ -82,8 +83,8 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
   }, [choice, enabled]);
 
   useEffect(() => {
-    if (!enabled || !measurementId || !window.gtag) return;
-    window.gtag('event', 'page_view', {
+    if (!enabled || !measurementId) return;
+    trackEvent('page_view', {
       page_location: window.location.href,
       page_path: pathname,
       page_title: document.title,

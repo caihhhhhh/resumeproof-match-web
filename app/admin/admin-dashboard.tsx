@@ -40,6 +40,8 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
   const [range, setRange] = useState<AdminRangeKey>('24h');
   const [search, setSearch] = useState('');
   const snapshot = runtimeData.ranges[range];
+  const productSnapshot = runtimeData.productRanges[range];
+  const productStepMax = Math.max(1, ...productSnapshot.steps.map((step) => step.count));
 
   useGSAP(() => {
     gsap.from('.admin-kpi-card', {
@@ -94,6 +96,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
 
         <nav className="admin-nav" aria-label="后台导航">
           <a className="is-active" href="#overview"><span>总览</span></a>
+          <a href="#product-funnel"><span>产品漏斗</span></a>
           <a href="#requests"><span>请求记录</span></a>
           <a href="#quality"><span>模型质量</span></a>
           <a href="#samples"><span>授权样本</span></a>
@@ -144,6 +147,40 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
               </article>
             ))}
           </div>
+        </section>
+
+        <section id="product-funnel" className="admin-grid-row admin-product-row">
+          <article className="admin-panel admin-product-panel">
+            <div className="admin-panel-head"><div><h2>产品使用漏斗</h2><p>覆盖所有访客的无正文事件次数；重复操作会重复计数，不等同于独立用户。</p></div><span className="admin-live"><i /> LIVE DATA</span></div>
+            <div className="admin-product-kpis">
+              {productSnapshot.kpis.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.note}</small></div>)}
+            </div>
+            <div className="admin-product-funnel">
+              {productSnapshot.steps.map((step, index) => (
+                <div key={step.key}>
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <b>{step.label}</b>
+                  <i><em style={{ width: `${step.count / productStepMax * 100}%` }} /></i>
+                  <strong>{step.count}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="admin-product-quality">
+              <div><span>分析成功率</span><b>{productSnapshot.quality.analysisSuccessRate === null ? '—' : `${productSnapshot.quality.analysisSuccessRate.toFixed(1)}%`}</b></div>
+              <div><span>建议采用率</span><b>{productSnapshot.quality.suggestionAcceptanceRate === null ? '—' : `${productSnapshot.quality.suggestionAcceptanceRate.toFixed(1)}%`}</b></div>
+              <div><span>分析失败事件</span><b>{productSnapshot.quality.analysisFailures}</b></div>
+            </div>
+          </article>
+
+          <article className="admin-panel admin-key-events-panel">
+            <div className="admin-panel-head"><div><h2>GA4 关键事件</h2><p>用于区分“浏览过”与“真正完成价值动作”。</p></div></div>
+            <div className="admin-key-event-list">
+              <div><code>analysis_completed</code><span>获得完整匹配报告</span></div>
+              <div><code>review_draft_confirmed</code><span>确认最终文字审核稿</span></div>
+              <div><code>resume_exported</code><span>导出 HTML 或打印 PDF</span></div>
+            </div>
+            <p>事件已经发送至 GA4；首次出现后，在 GA4 管理后台将以上三项标记为关键事件。</p>
+          </article>
         </section>
 
         <section className="admin-grid-row" id="quality">
@@ -262,7 +299,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
           <article className="admin-ga-card">
             <div className="admin-ga-copy">
               <span className="admin-provider-mark is-ga">GA4</span>
-              <div><b>Google Analytics 4</b><small>只记录匿名页面与产品漏斗事件，不发送简历、JD 或文件名。</small></div>
+              <div><b>Google Analytics 4</b><small>记录页面与产品漏斗事件，不发送简历、JD 或文件名；拒绝分析 Cookie 时使用无 Cookie 基础测量。</small></div>
             </div>
             <div className="admin-ga-form">
               <label htmlFor="ga-measurement-id">Measurement ID</label>

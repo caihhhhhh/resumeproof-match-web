@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { OptimizationReview, SuggestionDecision } from '../../components/optimization-review';
 import { ResumeDocument, ResumeTemplate, ReviewBlock } from '../../components/resume-document';
 import { SiteFooter } from '../../components/site-footer';
@@ -310,6 +310,8 @@ export default function NewMatchPage() {
   const [sampleConsent, setSampleConsent] = useState(false);
   const [sampleReference, setSampleReference] = useState('');
   const [sampleDeleted, setSampleDeleted] = useState(false);
+  const resumeReadyTracked = useRef(false);
+  const jdReadyTracked = useRef(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -326,7 +328,7 @@ export default function NewMatchPage() {
           const savedJdText = typeof draft.jdText === 'string' ? draft.jdText : '';
           setResumeMode(draft.resumeMode === 'paste' ? 'paste' : 'upload');
           setResumeText(savedResumeText);
-          if (savedResumeText.length >= 80) setResumeState('ready');
+          if (savedResumeText.length >= 80) { setResumeState('ready'); resumeReadyTracked.current = true; }
           const savedJdEntry = typeof draft.jdEntry === 'string'
             ? draft.jdEntry
             : typeof draft.jdUrl === 'string' && draft.jdUrl
@@ -334,6 +336,7 @@ export default function NewMatchPage() {
               : savedJdText;
           setJdEntry(savedJdEntry);
           setJdText(savedJdText);
+          if (savedJdText.length >= 80) jdReadyTracked.current = true;
           setJdSource(typeof draft.jdSource === 'string' ? draft.jdSource : '');
           setJobTitle(typeof draft.jobTitle === 'string' ? draft.jobTitle : '');
           setJobCompany(typeof draft.jobCompany === 'string' ? draft.jobCompany : '');
@@ -382,7 +385,7 @@ export default function NewMatchPage() {
     if (file.size > 8 * 1024 * 1024) {
       setResumeFile(null); setResumeName(''); setResumeState('error'); setResumeError(t.tooLarge); event.target.value = ''; return;
     }
-    setResumeFile(file); setResumeName(file.name); setResumeText(''); setResumeState('working'); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    setResumeFile(file); setResumeName(file.name); setResumeText(''); setResumeState('working'); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt(''); resumeReadyTracked.current = false;
     trackEvent('resume_upload_started', { file_type: fileExtension(file.name), file_size: fileSizeBucket(file.size) });
     try {
       const localText = await readResumeFile(file).catch(() => '');
@@ -393,6 +396,8 @@ export default function NewMatchPage() {
       if (text.length >= 80) {
         setResumeState('ready');
         trackEvent('resume_upload_completed', { file_type: fileExtension(file.name), extraction: usedOcr ? 'ocr' : 'local' });
+        trackEvent('resume_input_ready', { method: usedOcr ? 'ocr' : 'upload' });
+        resumeReadyTracked.current = true;
       } else {
         setResumeState('error'); setResumeError(t.ocrFailed);
         trackEvent('resume_upload_failed', { reason: 'insufficient_text', extraction: usedOcr ? 'ocr' : 'local' });
@@ -416,16 +421,27 @@ export default function NewMatchPage() {
 
   function handleJdEntry(value: string) {
     setJdEntry(value); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation(''); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
-    if (/^https?:\/\//i.test(value.trim())) { setJdText(''); setJdState('idle'); }
-    else { setJdText(value); setJdState(value.trim().length >= 80 ? 'ready' : 'idle'); }
+    if (/^https?:\/\//i.test(value.trim())) { setJdText(''); setJdState('idle'); jdReadyTracked.current = false; }
+    else {
+      const ready = value.trim().length >= 80;
+      setJdText(value); setJdState(ready ? 'ready' : 'idle');
+      if (ready && !jdReadyTracked.current) trackEvent('jd_input_ready', { method: 'paste' });
+      jdReadyTracked.current = ready;
+    }
   }
 
   function changeResumeText(value: string) {
     setResumeText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    const ready = value.trim().length >= 80;
+    if (ready && !resumeReadyTracked.current) trackEvent('resume_input_ready', { method: resumeMode === 'paste' ? 'paste' : 'edit' });
+    resumeReadyTracked.current = ready;
   }
 
   function changeParsedJd(value: string) {
     setJdText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    const ready = value.trim().length >= 80;
+    if (ready && !jdReadyTracked.current) trackEvent('jd_input_ready', { method: 'edit' });
+    jdReadyTracked.current = ready;
   }
 
   async function parseJobLink() {
@@ -447,6 +463,8 @@ export default function NewMatchPage() {
       if (data.status === 'success' && data.jdText) {
         setJdText(data.jdText); setJobTitle(data.title ?? ''); setJobCompany(data.company ?? ''); setJobLocation(data.location ?? ''); setJdState('ready'); setJdMessage(t.linkParsed);
         trackEvent('jd_link_parse_completed', { source: data.sourceLabel || source });
+        if (!jdReadyTracked.current) trackEvent('jd_input_ready', { method: 'url' });
+        jdReadyTracked.current = true;
       } else if ((data.error || data.code) === 'SITE_RATE_LIMIT') { setJdState('error'); setJdMessage(t.siteRate); }
       else if (data.code === 'JOB_DETAIL_REQUIRED') { setJdState('paste_required'); setJdMessage(t.detailLinkRequired); trackEvent('jd_link_parse_failed', { reason: data.code, source }); }
       else { setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: data.error || data.code || 'paste_required', source }); }

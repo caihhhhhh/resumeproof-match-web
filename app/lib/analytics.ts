@@ -3,8 +3,14 @@
 type AnalyticsValue = string | number | boolean;
 
 export function trackEvent(name: string, parameters: Record<string, AnalyticsValue> = {}) {
-  if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
-  window.gtag('event', name, parameters);
+  if (typeof window === 'undefined') return;
+  void fetch('/api/analytics/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventName: name, pagePath: window.location.pathname, properties: parameters }),
+    keepalive: true,
+  }).catch(() => undefined);
+  window.gtag?.('event', name, parameters);
 }
 
 export function fileSizeBucket(bytes: number) {
