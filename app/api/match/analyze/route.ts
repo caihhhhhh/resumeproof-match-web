@@ -1,4 +1,5 @@
 import type { EvidenceItem, MatchAnalysis, OptimizationSuggestion, RequirementImportance, ScoreBreakdown } from '../../../lib/match-analysis';
+import { saveConsentedSample } from '../../../lib/content-samples';
 import { guardApiRequest, privateJson } from '../../../lib/request-guard';
 import { trackRuntimeResponse } from '../../../lib/runtime-telemetry';
 
@@ -271,11 +272,12 @@ export async function POST(request: Request) {
   }, response);
   const blocked = guardApiRequest(request, { bucket: 'match-analysis', limit: 8, maxBytes: 256 * 1024 });
   if (blocked) return done(blocked);
-  let body: { resumeText?: unknown; jdText?: unknown; language?: unknown };
+  let body: { resumeText?: unknown; jdText?: unknown; language?: unknown; sampleConsent?: unknown };
   try { body = await request.json(); } catch { return done(privateJson({ error: 'INVALID_JSON' }, { status: 400 })); }
   const resumeText = typeof body.resumeText === 'string' ? body.resumeText.trim() : '';
   const jdText = typeof body.jdText === 'string' ? body.jdText.trim() : '';
   const language = body.language === 'en' ? 'en' : 'zh';
+  const sampleConsent = body.sampleConsent === true;
   if (resumeText.length < 80 || jdText.length < 80) return done(privateJson({ error: 'MATERIALS_TOO_SHORT' }, { status: 400 }));
   if (resumeText.length > 40_000 || jdText.length > 30_000) return done(privateJson({ error: 'MATERIALS_TOO_LONG' }, { status: 413 }));
 
@@ -343,5 +345,8 @@ export async function POST(request: Request) {
     coveredTerms: raw.strengths.slice(0, 6), missingTerms: raw.gaps.slice(0, 6), evidence,
     metricSignals: metricSignals(resumeText), suggestions,
   };
-  return done(privateJson({ analysis }));
+  const sampleReference = sampleConsent ? await saveConsentedSample({
+    resumeText, jdText, language, score: overall, grade, summary: raw.summary,
+  }) : null;
+  return done(privateJson({ analysis, sampleReference }));
 }

@@ -96,6 +96,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
           <a className="is-active" href="#overview"><span>总览</span></a>
           <a href="#requests"><span>请求记录</span></a>
           <a href="#quality"><span>模型质量</span></a>
+          <a href="#samples"><span>授权样本</span></a>
           <a href="#feedback"><span>用户反馈</span></a>
           <a href="#credentials"><span>API 密钥</span></a>
           <a href="#settings"><span>系统设置</span></a>
@@ -200,6 +201,30 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
           </div>
         </section>
 
+        <section id="samples" className="admin-panel admin-samples-panel">
+          <div className="admin-panel-head">
+            <div><h2>授权分析样本</h2><p>仅展示用户主动勾选后保存的脱敏材料，30 天后自动删除。</p></div>
+            <span className="admin-count">{runtimeData.samples.length}</span>
+          </div>
+          <div className="admin-sample-list">
+            {runtimeData.samples.map((sample) => (
+              <details className="admin-sample" key={sample.reference}>
+                <summary>
+                  <span><b>{sample.grade} · {sample.score}/100</b><small>{formatEventTime(sample.time, true)} · {sample.language.toUpperCase()}</small></span>
+                  <span>{sample.summary}</span>
+                  <code>{sample.reference.slice(0, 8)}</code>
+                </summary>
+                <div className="admin-sample-materials">
+                  <section><h3>脱敏简历</h3><pre>{sample.resumeText}</pre></section>
+                  <section><h3>目标 JD</h3><pre>{sample.jdText}</pre></section>
+                </div>
+                <p>自动删除时间：{formatEventTime(sample.expiresAt, true)} · 自动脱敏可能无法识别所有个人信息，请勿导出或转发。</p>
+              </details>
+            ))}
+            {!runtimeData.samples.length && <div className="admin-empty-state">目前没有用户主动授权保存的样本。</div>}
+          </div>
+        </section>
+
         <section className="admin-grid-row admin-bottom-row" id="feedback">
           <article className="admin-panel admin-feedback-panel">
             <div className="admin-panel-head"><div><h2>用户反馈</h2><p>只有实际收集后才展示评分，不用示例数字占位。</p></div><strong>—</strong></div>
@@ -208,7 +233,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
 
           <article className="admin-panel admin-settings-panel" id="settings">
             <div className="admin-panel-head"><div><h2>隐私与保护</h2><p>默认少留数据，必要时再扩展。</p></div></div>
-            <div className="admin-setting-row is-static"><span><b>不保存材料原文</b><small>仅保留匿名运行指标</small></span><strong>已开启</strong></div>
+            <div className="admin-setting-row is-static"><span><b>材料留存</b><small>仅保存主动授权的脱敏样本，30 天自动删除</small></span><strong>受控</strong></div>
             <div className="admin-setting-row is-static"><span><b>API 限流</b><small>异常请求自动降速</small></span><strong>已开启</strong></div>
             <div className="admin-setting-row is-static"><span><b>管理权限</b><small>ChatGPT 登录与服务端白名单</small></span><strong>已开启</strong></div>
           </article>

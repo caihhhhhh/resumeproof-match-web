@@ -1,4 +1,5 @@
 import { readRuntimeEvents, type RuntimeEventRow, type RuntimeRequestType } from './runtime-telemetry';
+import { readContentSamples } from './content-samples';
 
 export type AdminRangeKey = '24h' | '7d' | '30d';
 
@@ -14,6 +15,17 @@ export type AdminRuntimeSnapshot = {
 export type AdminRuntimeData = {
   ranges: Record<AdminRangeKey, AdminRuntimeSnapshot>;
   hasData: boolean;
+  samples: Array<{
+    reference: string;
+    time: number;
+    expiresAt: number;
+    language: 'zh' | 'en';
+    resumeText: string;
+    jdText: string;
+    score: number;
+    grade: 'A' | 'B' | 'C';
+    summary: string;
+  }>;
   providers: {
     deepseek: { configured: boolean; model: string; lastSuccess: number | null };
     zhipu: { configured: boolean; model: string; lastSuccess: number | null };
@@ -144,7 +156,10 @@ function buildSnapshot(rows: RuntimeEventRow[], now: number, windowMs: number, l
 
 export async function getAdminRuntimeData(): Promise<AdminRuntimeData> {
   const now = Date.now();
-  const rows = await readRuntimeEvents(now - 60 * 24 * 60 * 60_000);
+  const [rows, sampleRows] = await Promise.all([
+    readRuntimeEvents(now - 60 * 24 * 60 * 60_000),
+    readContentSamples(),
+  ]);
   const latestSuccess = (provider: string) => rows.find((row) => row.provider === provider && row.status === 'success')?.occurred_at_ms ?? null;
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? '';
   return {
@@ -154,6 +169,17 @@ export async function getAdminRuntimeData(): Promise<AdminRuntimeData> {
       '30d': buildSnapshot(rows, now, 30 * 24 * 60 * 60_000, '最近 30 天'),
     },
     hasData: rows.length > 0,
+    samples: sampleRows.map((row) => ({
+      reference: row.public_id,
+      time: row.occurred_at_ms,
+      expiresAt: row.expires_at_ms,
+      language: row.language,
+      resumeText: row.resume_text,
+      jdText: row.jd_text,
+      score: row.score,
+      grade: row.grade,
+      summary: row.summary,
+    })),
     providers: {
       deepseek: { configured: Boolean(process.env.DEEPSEEK_API_KEY), model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash', lastSuccess: latestSuccess('deepseek') },
       zhipu: { configured: Boolean(process.env.ZHIPU_API_KEY), model: process.env.ZHIPU_VISION_MODEL || 'glm-4.6v-flash', lastSuccess: latestSuccess('zhipu') },

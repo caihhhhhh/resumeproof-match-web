@@ -39,6 +39,7 @@ type StoredDraft = {
   confirmedDraft?: string;
   confirmedAt?: string;
   selectedTemplate?: ResumeTemplate;
+  sampleReference?: string;
   step?: number;
 };
 
@@ -53,7 +54,7 @@ const copy = {
     resumePlaceholder: '粘贴完整简历内容……', reviewResume: '查看或编辑读取到的简历文字', restoredResume: '已恢复当前标签页中的简历文字',
     jdTitle: '目标岗位', jdBody: '同一个输入框可接收职位链接或完整 JD。', jdPlaceholder: '粘贴职位链接，或直接粘贴职责与任职要求……',
     parseLink: '读取职位链接', parsingLink: '正在读取…', detected: '已识别来源', linkParsed: '职位内容已读取，请检查原文。', pasteRequired: '该页面无法可靠自动读取，请把完整 JD 粘贴到输入框。', detailLinkRequired: '请粘贴具体职位详情页链接，而不是搜索结果或职位列表页。',
-    invalidUrl: '请输入有效的 HTTPS 招聘链接。', reviewJd: '查看或编辑读取到的 JD 文字', characters: '字符', start: '开始 AI 分析', confirmAndAnalyze: '确认识别文字并分析', analyzing: 'AI 正在分析…', startHint: '点击后，已核对的简历与 JD 文字将发送给 DeepSeek 做语义分析；图片或扫描 PDF 仅在识别时发送给智谱。',
+    invalidUrl: '请输入有效的 HTTPS 招聘链接。', reviewJd: '查看或编辑读取到的 JD 文字', characters: '字符', start: '开始 AI 分析', confirmAndAnalyze: '确认识别文字并分析', analyzing: 'AI 正在分析…', startHint: '点击后，已核对的简历与 JD 文字将发送给 DeepSeek 做语义分析；图片或扫描 PDF 仅在识别时发送给智谱。', sampleConsent: '允许保存自动脱敏后的简历与 JD 30 天，用于改进匹配质量（可选）', samplePrivacy: '了解数据处理', sampleSaved: '脱敏样本已保存 30 天', sampleDelete: '立即删除', sampleDeleted: '样本已删除',
     aiNotConfigured: '分析服务尚未配置，请联系网站管理员。', aiFailed: '分析服务暂时不可用，请稍后重试。', aiAuth: '分析服务授权异常，请联系网站管理员。', aiBalance: '分析服务额度不足，请联系网站管理员。', aiRate: '分析服务请求过于频繁，请稍后重试。', siteRate: '当前设备请求较频繁，请稍后再试。', aiOutput: '完整报告未生成成功，请重新分析。系统不会展示缺少评分、证据或建议的半成品。', aiTimeout: '分析超过 60 秒仍未响应，请重新分析。',
     resultBack: '返回修改材料', matchTitle: '证据先于分数。', matchBody: 'AI 会识别同义表达和可迁移经验，但每项匹配都必须引用真实的简历原句。结果不代表招聘决定。',
     scoreLabel: '证据匹配度', gradeA: '值得投递', gradeB: '有条件投递', gradeC: '证据不足', scoreMethod: '必须项、重要项、加分项分别按 3、2、1 权重计算；存在关键必须项缺口时不会标记为“值得投递”。', mustCoverage: '必须项覆盖', importantCoverage: '重要项覆盖', bonusCoverage: '加分项覆盖', verifiedCoverage: '原句核验率', mustNote: '对最终判断影响最大', importantNote: '影响岗位胜任度', bonusNote: '不满足通常不构成淘汰', verifiedNote: '匹配项中可核对简历原句的比例',
@@ -75,7 +76,7 @@ const copy = {
     resumePlaceholder: 'Paste the complete resume here…', reviewResume: 'Review or edit the extracted resume text', restoredResume: 'Restored text from this browser tab',
     jdTitle: 'Target role', jdBody: 'The same field accepts a job link or the complete JD.', jdPlaceholder: 'Paste a job link or the complete responsibilities and requirements…',
     parseLink: 'Read job link', parsingLink: 'Reading…', detected: 'Detected source', linkParsed: 'Job content extracted. Review the source text.', pasteRequired: 'This page cannot be read reliably. Paste the complete JD into the field.', detailLinkRequired: 'Paste a specific job-detail URL rather than a search or job-listing page.',
-    invalidUrl: 'Enter a valid HTTPS job posting URL.', reviewJd: 'Review or edit the extracted JD text', characters: 'characters', start: 'Start AI analysis', confirmAndAnalyze: 'Confirm extracted text and analyze', analyzing: 'AI is analyzing…', startHint: 'After you click, reviewed resume and JD text is sent to DeepSeek for semantic analysis. Images or scanned PDFs are sent to Zhipu only for recognition.',
+    invalidUrl: 'Enter a valid HTTPS job posting URL.', reviewJd: 'Review or edit the extracted JD text', characters: 'characters', start: 'Start AI analysis', confirmAndAnalyze: 'Confirm extracted text and analyze', analyzing: 'AI is analyzing…', startHint: 'After you click, reviewed resume and JD text is sent to DeepSeek for semantic analysis. Images or scanned PDFs are sent to Zhipu only for recognition.', sampleConsent: 'Save an automatically redacted resume and JD for 30 days to improve matching (optional)', samplePrivacy: 'How data is handled', sampleSaved: 'Redacted sample saved for 30 days', sampleDelete: 'Delete now', sampleDeleted: 'Sample deleted',
     aiNotConfigured: 'The analysis service is not configured. Contact the site administrator.', aiFailed: 'The analysis service is temporarily unavailable. Please try again.', aiAuth: 'The analysis service has an authorization issue. Contact the site administrator.', aiBalance: 'The analysis service has insufficient quota. Contact the site administrator.', aiRate: 'The analysis service is rate-limiting requests. Try again shortly.', siteRate: 'This device has made too many requests. Please try again shortly.', aiOutput: 'The complete report could not be generated. Please retry; incomplete scores, evidence, or suggestions will never be shown.', aiTimeout: 'Analysis did not finish within 60 seconds. Please run it again.',
     resultBack: 'Back to materials', matchTitle: 'Evidence before scores.', matchBody: 'AI can recognize equivalent wording and transferable experience, but every match must cite a real resume excerpt. Results are not hiring decisions.',
     scoreLabel: 'Evidence match', gradeA: 'Pursue', gradeB: 'Conditional fit', gradeC: 'Evidence gap', scoreMethod: 'Must-have, important, and bonus requirements use 3:2:1 weights. A critical must-have gap prevents a “Pursue” recommendation.', mustCoverage: 'Must-have coverage', importantCoverage: 'Important coverage', bonusCoverage: 'Bonus coverage', verifiedCoverage: 'Source verification', mustNote: 'Largest impact on the final score', importantNote: 'Material to role readiness', bonusNote: 'Usually not disqualifying', verifiedNote: 'Share of mappings backed by exact resume excerpts',
@@ -306,6 +307,9 @@ export default function NewMatchPage() {
   const [confirmedDraft, setConfirmedDraft] = useState('');
   const [confirmedAt, setConfirmedAt] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<ResumeTemplate>('balanced');
+  const [sampleConsent, setSampleConsent] = useState(false);
+  const [sampleReference, setSampleReference] = useState('');
+  const [sampleDeleted, setSampleDeleted] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -341,6 +345,7 @@ export default function NewMatchPage() {
             if (typeof draft.reviewDraft === 'string') setReviewDraft(draft.reviewDraft);
             if (typeof draft.confirmedDraft === 'string') setConfirmedDraft(draft.confirmedDraft);
             if (typeof draft.confirmedAt === 'string') setConfirmedAt(draft.confirmedAt);
+            if (typeof draft.sampleReference === 'string') setSampleReference(draft.sampleReference);
             if (draft.selectedTemplate === 'balanced' || draft.selectedTemplate === 'compact' || draft.selectedTemplate === 'minimal') setSelectedTemplate(draft.selectedTemplate);
             const savedScreen = String(draft.screen ?? '');
             if (['review', 'confirmed', 'template', 'export'].includes(savedScreen) && typeof draft.reviewDraft === 'string' && draft.reviewDraft.length >= 80) setScreen('review');
@@ -357,9 +362,9 @@ export default function NewMatchPage() {
 
   useEffect(() => {
     if (!draftRestored) return;
-    const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, suggestionDecisions, suggestionNotes, reviewDraft, confirmedDraft, confirmedAt, selectedTemplate };
+    const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, suggestionDecisions, suggestionNotes, reviewDraft, confirmedDraft, confirmedAt, selectedTemplate, sampleReference };
     try { window.sessionStorage.setItem('resumematch-current-draft', JSON.stringify(draft)); } catch { /* Keep the current tab usable if browser storage is unavailable. */ }
-  }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, suggestionDecisions, suggestionNotes, reviewDraft, confirmedDraft, confirmedAt, selectedTemplate]);
+  }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, suggestionDecisions, suggestionNotes, reviewDraft, confirmedDraft, confirmedAt, selectedTemplate, sampleReference]);
 
   useEffect(() => {
     if (analysisState !== 'working') return;
@@ -542,10 +547,10 @@ export default function NewMatchPage() {
     try {
       const response = await fetch('/api/match/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resumeText, jdText, language }),
+        body: JSON.stringify({ resumeText, jdText, language, sampleConsent }),
         signal: controller.signal,
       });
-      const data = (await response.json()) as { analysis?: unknown; error?: string };
+      const data = (await response.json()) as { analysis?: unknown; error?: string; sampleReference?: string | null };
       if (!response.ok || !isMatchAnalysis(data.analysis)) {
         const errors: Record<string, string> = {
           AI_NOT_CONFIGURED: t.aiNotConfigured,
@@ -561,7 +566,7 @@ export default function NewMatchPage() {
         trackEvent('analysis_failed', { reason: (data.error || 'invalid_report').slice(0, 36) });
         setAnalysisState('error'); return;
       }
-      setResumeNeedsReview(false); setAnalysis(data.analysis); setAnalysisState('idle'); setScreen('results');
+      setResumeNeedsReview(false); setAnalysis(data.analysis); setAnalysisState('idle'); setSampleReference(typeof data.sampleReference === 'string' ? data.sampleReference : ''); setSampleDeleted(false); setScreen('results');
       trackEvent('analysis_completed', { grade: data.analysis.grade, score_band: `${Math.floor(data.analysis.overall / 10) * 10}s`, suggestion_count: data.analysis.suggestions.length });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
@@ -569,6 +574,14 @@ export default function NewMatchPage() {
       setAnalysisError(reason === 'timeout' ? t.aiTimeout : t.aiFailed); setAnalysisState('error');
       trackEvent('analysis_failed', { reason });
     } finally { window.clearTimeout(timeout); }
+  }
+
+  async function deleteSavedSample() {
+    if (!sampleReference) return;
+    const response = await fetch(`/api/samples/${encodeURIComponent(sampleReference)}`, { method: 'DELETE' });
+    if (!response.ok) return;
+    setSampleReference('');
+    setSampleDeleted(true);
   }
 
   return (
@@ -623,12 +636,16 @@ export default function NewMatchPage() {
           </div>
 
           {analysisError && <p className="analysis-error" role="alert">{analysisError}</p>}
-          <footer className="workspace-action"><p>{t.startHint}</p><button type="button" disabled={!resumeReady || !jdReady || analysisState === 'working'} onClick={runAiAnalysis}>{analysisState === 'working' ? `${t.analyzing} ${analysisSeconds}s` : resumeNeedsReview ? t.confirmAndAnalyze : t.start}<span aria-hidden="true">→</span></button></footer>
+          <footer className="workspace-action">
+            <div><p>{t.startHint}</p><label className="sample-consent"><input type="checkbox" checked={sampleConsent} onChange={(event) => setSampleConsent(event.target.checked)} /><span>{t.sampleConsent}</span><Link href="/privacy" target="_blank">{t.samplePrivacy}</Link></label></div>
+            <button type="button" disabled={!resumeReady || !jdReady || analysisState === 'working'} onClick={runAiAnalysis}>{analysisState === 'working' ? `${t.analyzing} ${analysisSeconds}s` : resumeNeedsReview ? t.confirmAndAnalyze : t.start}<span aria-hidden="true">→</span></button>
+          </footer>
         </section>
       ) : screen === 'results' && analysis ? (
         <section className="match-workbench" aria-labelledby="match-workbench-title">
           <div className="results-toolbar"><button type="button" onClick={() => setScreen('materials')}><span aria-hidden="true">←</span>{t.resultBack}</button><small>{t.localRules}</small></div>
           <header className="workbench-heading"><div><h1 id="match-workbench-title">{t.matchTitle}</h1><p>{t.matchBody}</p><blockquote className="analysis-summary">{analysis.summary}</blockquote></div></header>
+          {(sampleReference || sampleDeleted) && <div className="sample-receipt"><span>{sampleDeleted ? t.sampleDeleted : `${t.sampleSaved} · ${sampleReference.slice(0, 8)}`}</span>{sampleReference && <button type="button" onClick={deleteSavedSample}>{t.sampleDelete}</button>}</div>}
           <div className="diagnostic-grid">
             <article className={`score-panel grade-${analysis.grade.toLowerCase()}`}><span>{t.scoreLabel}</span><small className="score-method">{t.scoreMethod}</small><strong>{analysis.overall}<small>/100</small></strong><p>{gradeCopy}</p></article>
             <div className="dimension-panel">{[
