@@ -26,8 +26,11 @@ export type AdminRuntimeSnapshot = {
   label: string;
   kpis: Array<{ label: string; value: string; delta: string; tone: string }>;
   pipeline: Array<{ label: string; successRate: number | null; total: number }>;
+  providers: Array<{ key: string; label: string; total: number; successRate: number | null; p95: string; cost: string }>;
+  sources: Array<{ key: string; label: string; total: number; successRate: number | null }>;
+  usage: { inputTokens: number; outputTokens: number; cacheHitTokens: number; cost: string; costCoverage: string };
   incidents: Array<{ time: number; title: string; copy: string; state: string }>;
-  requests: Array<{ id: number; time: number; type: string; model: string; duration: string; status: string }>;
+  requests: Array<{ id: number; time: number; type: string; source: string; model: string; duration: string; cost: string; status: string }>;
   summary: { lossPoint: string; fallbackCount: number; failureCount: number };
 };
 
@@ -60,6 +63,22 @@ const requestLabels: Record<RuntimeRequestType, string> = {
   jd_parse: 'JD 链接解析',
 };
 
+const providerLabels: Record<string, string> = {
+  deepseek: 'DeepSeek',
+  zhipu: '智谱 GLM',
+  local: '站内解析',
+};
+
+const sourceLabels: Record<string, string> = {
+  workspace: '粘贴 / 工作台', upload: '文件上传', linkedin: 'LinkedIn', boss: 'BOSS 直聘',
+  liepin: '猎聘', greenhouse: 'Greenhouse', lever: 'Lever', ashby: 'Ashby', unknown: '未采集',
+};
+
+const methodLabels: Record<string, string> = {
+  semantic_match: '语义匹配', vision_ocr: '视觉 OCR', official_ats_api: '官方 ATS API',
+  structured_data: '结构化数据', zhipu_reader: '智谱网页读取', reader: '网页读取', validation: '链接校验',
+};
+
 const errorLabels: Record<string, string> = {
   DEEPSEEK_TIMEOUT: 'AI 分析超时',
   DEEPSEEK_AUTH_FAILED: 'DeepSeek 密钥验证失败',
@@ -82,10 +101,10 @@ const errorLabels: Record<string, string> = {
   OCR_NOT_CONFIGURED: 'OCR 尚未配置',
 };
 
-function percentile50(values: number[]) {
+function percentile(values: number[], quantile: number) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor((sorted.length - 1) / 2)];
+  return sorted[Math.max(0, Math.ceil(sorted.length * quantile) - 1)];
 }
 
 function percent(value: number, total: number) {
@@ -110,6 +129,13 @@ function formatDuration(milliseconds: number | null) {
   return milliseconds >= 1_000 ? `${(milliseconds / 1_000).toFixed(1)}s` : `${milliseconds}ms`;
 }
 
+function formatCost(microusd: number | null) {
+  if (microusd === null) return '未采集';
+  const usd = microusd / 1_000_000;
+  if (usd > 0 && usd < 0.0001) return '<$0.0001';
+  return `$${usd.toFixed(4)}`;
+}
+
 function buildSnapshot(rows: RuntimeEventRow[], now: number, windowMs: number, label: string): AdminRuntimeSnapshot {
   const start = now - windowMs;
   const previousStart = start - windowMs;
@@ -119,10 +145,13 @@ function buildSnapshot(rows: RuntimeEventRow[], now: number, windowMs: number, l
   const previousSuccesses = previous.filter((row) => row.status === 'success').length;
   const successRate = percent(successes, current.length);
   const previousSuccessRate = percent(previousSuccesses, previous.length);
-  const p50 = percentile50(current.map((row) => row.duration_ms));
-  const previousP50 = percentile50(previous.map((row) => row.duration_ms));
+  const p95 = percentile(current.map((row) => row.duration_ms), 0.95);
+  const previousP95 = percentile(previous.map((row) => row.duration_ms), 0.95);
   const failures = current.filter((row) => row.status === 'failure');
   const fallbackCount = current.filter((row) => row.status === 'fallback').length;
+  const aiRequests = current.filter((row) => row.provider === 'deepseek' || row.provider === 'zhipu');
+  const costedRequests = aiRequests.filter((row) => row.estimated_cost_microusd !== null);
+  const totalCost = costedRequests.reduce((total, row) => total + (row.estimated_cost_microusd ?? 0), 0);
 
   const pipeline = (Object.keys(requestLabels) as RuntimeRequestType[]).map((requestType) => {
     const items = current.filter((row) => row.request_type === requestType);
@@ -153,22 +182,56 @@ function buildSnapshot(rows: RuntimeEventRow[], now: number, windowMs: number, l
       state: '待关注',
     }));
 
+  const providers = [...new Set(current.map((row) => row.provider))].map((provider) => {
+    const items = current.filter((row) => row.provider === provider);
+    const costed = items.filter((row) => row.estimated_cost_microusd !== null);
+    return {
+      key: provider,
+      label: providerLabels[provider] ?? provider,
+      total: items.length,
+      successRate: percent(items.filter((row) => row.status === 'success').length, items.length),
+      p95: formatDuration(percentile(items.map((row) => row.duration_ms), 0.95)),
+      cost: costed.length ? formatCost(costed.reduce((sum, row) => sum + (row.estimated_cost_microusd ?? 0), 0)) : '未采集',
+    };
+  }).sort((a, b) => b.total - a.total);
+
+  const sources = [...new Set(current.map((row) => row.source || 'unknown'))].map((source) => {
+    const items = current.filter((row) => (row.source || 'unknown') === source);
+    return {
+      key: source,
+      label: sourceLabels[source] ?? source,
+      total: items.length,
+      successRate: percent(items.filter((row) => row.status === 'success').length, items.length),
+    };
+  }).sort((a, b) => b.total - a.total);
+
   return {
     label,
     kpis: [
       { label: '处理请求', value: String(current.length), delta: countDelta(current.length, previous.length), tone: 'blue' },
       { label: '成功率', value: successRate === null ? '—' : `${successRate.toFixed(1)}%`, delta: delta(successRate, previousSuccessRate), tone: 'green' },
-      { label: 'P50 响应', value: formatDuration(p50), delta: p50 === null || previousP50 === null ? '开始累计' : `${p50 <= previousP50 ? '快' : '慢'} ${formatDuration(Math.abs(p50 - previousP50))}`, tone: 'violet' },
-      { label: '失败请求', value: String(failures.length), delta: failures.length ? '需查看' : '运行正常', tone: 'orange' },
+      { label: 'P95 响应', value: formatDuration(p95), delta: p95 === null || previousP95 === null ? '开始累计' : `${p95 <= previousP95 ? '快' : '慢'} ${formatDuration(Math.abs(p95 - previousP95))}`, tone: 'violet' },
+      { label: '估算 API 成本', value: costedRequests.length ? formatCost(totalCost) : '—', delta: aiRequests.length ? `${costedRequests.length}/${aiRequests.length} 条 AI 请求已计价` : '暂无 AI 请求', tone: 'orange' },
     ],
     pipeline,
+    providers,
+    sources,
+    usage: {
+      inputTokens: current.reduce((total, row) => total + row.input_tokens, 0),
+      outputTokens: current.reduce((total, row) => total + row.output_tokens, 0),
+      cacheHitTokens: current.reduce((total, row) => total + row.cache_hit_tokens, 0),
+      cost: costedRequests.length ? formatCost(totalCost) : '未采集',
+      costCoverage: aiRequests.length ? `${costedRequests.length}/${aiRequests.length}` : '0/0',
+    },
     incidents,
     requests: current.slice(0, 30).map((row) => ({
       id: row.id,
       time: row.occurred_at_ms,
       type: requestLabels[row.request_type],
-      model: row.model || row.provider,
+      source: sourceLabels[row.source || 'unknown'] ?? row.source ?? '未采集',
+      model: methodLabels[row.method || ''] ?? (row.model || row.provider),
       duration: formatDuration(row.duration_ms),
+      cost: row.estimated_cost_microusd === null ? '—' : formatCost(row.estimated_cost_microusd),
       status: row.status === 'success' ? '完成' : row.status === 'fallback' ? '已转为粘贴' : '失败',
     })),
     summary: { lossPoint, fallbackCount, failureCount: failures.length },

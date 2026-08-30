@@ -6,8 +6,15 @@ CREATE TABLE IF NOT EXISTS runtime_events (
   status TEXT NOT NULL CHECK (status IN ('success', 'failure', 'fallback')),
   provider TEXT NOT NULL,
   model TEXT,
+  source TEXT,
+  method TEXT,
   duration_ms INTEGER NOT NULL,
-  error_code TEXT
+  error_code TEXT,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_hit_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_miss_tokens INTEGER NOT NULL DEFAULT 0,
+  estimated_cost_microusd INTEGER
 )
 `;
 

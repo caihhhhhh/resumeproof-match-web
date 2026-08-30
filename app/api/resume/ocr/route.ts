@@ -38,8 +38,13 @@ function delay(milliseconds: number) {
 export async function POST(request: Request) {
   const startedAt = Date.now();
   const model = process.env.ZHIPU_VISION_MODEL?.trim() || 'glm-4.6v-flash';
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let usageReported = false;
   const done = (response: Response) => trackRuntimeResponse(startedAt, {
-    requestType: 'ocr', provider: 'zhipu', model,
+    requestType: 'ocr', provider: 'zhipu', model, source: 'upload', method: 'vision_ocr',
+    inputTokens, outputTokens,
+    estimatedCostMicrousd: usageReported && model.toLowerCase() === 'glm-4.6v-flash' ? 0 : null,
   }, response);
   const blocked = guardApiRequest(request, { bucket: 'resume-ocr', limit: 6, maxBytes: 42 * 1024 * 1024 });
   if (blocked) return done(blocked);
@@ -95,6 +100,7 @@ export async function POST(request: Request) {
       const payload = await response.json().catch(() => null) as {
         choices?: Array<{ message?: { content?: unknown } }>;
         error?: { code?: string | number; message?: string };
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
       } | null;
 
       if (response.status === 429 && attempt < RETRY_DELAYS.length) {
@@ -104,6 +110,12 @@ export async function POST(request: Request) {
       if (!response.ok) {
         const status = response.status === 401 || response.status === 403 ? 401 : response.status === 429 ? 429 : 502;
         return done(privateJson({ error: status === 401 ? 'OCR_AUTH' : status === 429 ? 'OCR_RATE_LIMIT' : 'OCR_UPSTREAM' }, { status }));
+      }
+
+      if (payload?.usage) {
+        usageReported = true;
+        inputTokens = Math.max(0, Math.round(payload.usage.prompt_tokens ?? 0));
+        outputTokens = Math.max(0, Math.round(payload.usage.completion_tokens ?? 0));
       }
 
       const text = cleanExtractedText(readMessageText(payload?.choices?.[0]?.message?.content));

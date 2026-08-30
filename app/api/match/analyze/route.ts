@@ -26,7 +26,19 @@ type RawEvidence = Omit<EvidenceItem, 'resumeEvidence'> & { sourceIds: number[] 
 type RawSuggestion = Omit<OptimizationSuggestion, 'originalText' | 'sourceStart' | 'sourceEnd'> & { sourceId: number };
 type ResumeSource = { text: string; start: number; end: number };
 
-type DeepSeekConfig = { apiKey: string; baseUrl: string; model: string };
+type DeepSeekUsage = {
+  promptTokens: number;
+  completionTokens: number;
+  cacheHitTokens: number;
+  cacheMissTokens: number;
+};
+
+type DeepSeekConfig = {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  onUsage?: (usage: DeepSeekUsage) => void;
+};
 
 class DeepSeekRequestError extends Error {
   constructor(public status: number) { super(`DEEPSEEK_HTTP_${status}`); }
@@ -226,6 +238,27 @@ function coreIsComplete(raw: RawCore | null, evidence: EvidenceItem[]) {
     && evidence.some((item) => item.resumeEvidence.length > 0);
 }
 
+function positiveInteger(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function envRate(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function estimateDeepSeekCostMicrousd(model: string, usage: DeepSeekUsage, at = new Date()) {
+  if (model.toLowerCase() !== 'deepseek-v4-flash') return null;
+  const day = at.getUTCDay();
+  const hour = at.getUTCHours();
+  const peak = day >= 1 && day <= 5 && ((hour >= 1 && hour < 4) || (hour >= 6 && hour < 10));
+  const hitRate = envRate(peak ? 'DEEPSEEK_INPUT_CACHE_HIT_PEAK_USD_PER_MTOK' : 'DEEPSEEK_INPUT_CACHE_HIT_OFFPEAK_USD_PER_MTOK', peak ? 0.014 : 0.007);
+  const missRate = envRate(peak ? 'DEEPSEEK_INPUT_CACHE_MISS_PEAK_USD_PER_MTOK' : 'DEEPSEEK_INPUT_CACHE_MISS_OFFPEAK_USD_PER_MTOK', peak ? 0.44 : 0.22);
+  const outputRate = envRate(peak ? 'DEEPSEEK_OUTPUT_PEAK_USD_PER_MTOK' : 'DEEPSEEK_OUTPUT_OFFPEAK_USD_PER_MTOK', peak ? 1.32 : 0.66);
+  // USD per million tokens is numerically equal to micro-USD per token.
+  return Math.round(usage.cacheHitTokens * hitRate + usage.cacheMissTokens * missRate + usage.completionTokens * outputRate);
+}
+
 async function deepSeekCompletion(config: DeepSeekConfig, instructions: string, input: string, maxTokens: number) {
   let response: Response;
   try {
@@ -247,7 +280,26 @@ async function deepSeekCompletion(config: DeepSeekConfig, instructions: string, 
     throw error;
   }
   if (!response.ok) throw new DeepSeekRequestError(response.status);
-  const result = await response.json() as { choices?: Array<{ message?: { content?: string | null } }> };
+  const result = await response.json() as {
+    choices?: Array<{ message?: { content?: string | null } }>;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      prompt_cache_hit_tokens?: number;
+      prompt_cache_miss_tokens?: number;
+    };
+  };
+  if (result.usage) {
+    const promptTokens = positiveInteger(result.usage.prompt_tokens);
+    const cacheHitTokens = positiveInteger(result.usage.prompt_cache_hit_tokens);
+    const reportedMissTokens = positiveInteger(result.usage.prompt_cache_miss_tokens);
+    config.onUsage?.({
+      promptTokens,
+      completionTokens: positiveInteger(result.usage.completion_tokens),
+      cacheHitTokens,
+      cacheMissTokens: reportedMissTokens || Math.max(0, promptTokens - cacheHitTokens),
+    });
+  }
   return result.choices?.[0]?.message?.content ?? null;
 }
 
@@ -267,8 +319,13 @@ async function requestSuggestions(config: DeepSeekConfig, resume: string, jd: st
 export async function POST(request: Request) {
   const startedAt = Date.now();
   const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
+  const usage: DeepSeekUsage = { promptTokens: 0, completionTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0 };
+  let usageReports = 0;
   const done = (response: Response) => trackRuntimeResponse(startedAt, {
-    requestType: 'match', provider: 'deepseek', model,
+    requestType: 'match', provider: 'deepseek', model, source: 'workspace', method: 'semantic_match',
+    inputTokens: usage.promptTokens, outputTokens: usage.completionTokens,
+    cacheHitTokens: usage.cacheHitTokens, cacheMissTokens: usage.cacheMissTokens,
+    estimatedCostMicrousd: usageReports ? estimateDeepSeekCostMicrousd(model, usage) : null,
   }, response);
   const blocked = guardApiRequest(request, { bucket: 'match-analysis', limit: 8, maxBytes: 256 * 1024 });
   if (blocked) return done(blocked);
@@ -284,7 +341,18 @@ export async function POST(request: Request) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return done(privateJson({ error: 'AI_NOT_CONFIGURED' }, { status: 503 }));
 
-  const config: DeepSeekConfig = { apiKey, baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com', model };
+  const config: DeepSeekConfig = {
+    apiKey,
+    baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+    model,
+    onUsage: (item) => {
+      usageReports += 1;
+      usage.promptTokens += item.promptTokens;
+      usage.completionTokens += item.completionTokens;
+      usage.cacheHitTokens += item.cacheHitTokens;
+      usage.cacheMissTokens += item.cacheMissTokens;
+    },
+  };
   const sources = resumeSources(resumeText);
   const [coreResult, suggestionResult] = await Promise.allSettled([
     requestCore(config, resumeText, jdText, language),

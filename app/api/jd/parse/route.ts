@@ -424,8 +424,12 @@ function readerMetadata(title: string, source: JobSource) {
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
+  let telemetrySource = 'unknown';
+  let telemetryProvider: 'local' | 'zhipu' = 'local';
+  let telemetryMethod = 'validation';
   const done = (result: Response, status?: 'success' | 'failure' | 'fallback') => trackRuntimeResponse(startedAt, {
-    requestType: 'jd_parse', provider: 'local', model: 'layered-job-parser',
+    requestType: 'jd_parse', provider: telemetryProvider, model: 'layered-job-parser',
+    source: telemetrySource, method: telemetryMethod,
   }, result, status);
   const blocked = guardApiRequest(request, { bucket: 'jd-parse', limit: 30, maxBytes: 4_096 });
   if (blocked) return done(blocked);
@@ -449,6 +453,7 @@ export async function POST(request: Request) {
   }
 
   const source = identifyJobSource(url.toString());
+  telemetrySource = source;
   if (source === 'unknown') {
     return done(response({ status: 'paste_required', source, sourceLabel: sourceLabels[source], canonicalUrl: url.toString(), code: 'UNSUPPORTED_SOURCE' }), 'fallback');
   }
@@ -460,6 +465,7 @@ export async function POST(request: Request) {
 
   let lastCode = 'NO_JOB_POSTING_DATA';
   if (source === 'greenhouse' || source === 'lever') {
+    telemetryMethod = 'official_ats_api';
     try {
       const posting = source === 'greenhouse'
         ? await fetchGreenhousePosting(url)
@@ -481,6 +487,8 @@ export async function POST(request: Request) {
   }
 
   for (const candidate of directCandidates(url, source)) {
+    telemetryProvider = 'local';
+    telemetryMethod = 'structured_data';
     try {
       const { html, finalUrl } = await fetchPublicPage(candidate);
       const posting = extractStructuredPosting(html);
@@ -523,6 +531,8 @@ export async function POST(request: Request) {
 
   let readerCode = lastCode;
   for (const readerSource of readers) {
+    telemetryProvider = readerSource.method === 'zhipu_reader' ? 'zhipu' : 'local';
+    telemetryMethod = readerSource.method;
     try {
       const reader = await readerSource.fetch();
       const jdText = extractLikelyJobText(reader.content || reader.description, source);

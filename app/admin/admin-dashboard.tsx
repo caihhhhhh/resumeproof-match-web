@@ -84,7 +84,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
   }, { scope: shellRef });
 
   const visibleRequests = snapshot.requests.filter((item) =>
-    `${item.type} ${item.model} ${item.status}`.toLowerCase().includes(search.toLowerCase()),
+    `${item.type} ${item.source} ${item.model} ${item.status}`.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -97,6 +97,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
 
         <nav className="admin-nav" aria-label="后台导航">
           <a className="is-active" href="#overview"><span>总览</span></a>
+          <a href="#performance"><span>来源与成本</span></a>
           <a href="#product-funnel"><span>产品漏斗</span></a>
           <a href="#requests"><span>请求记录</span></a>
           <a href="#quality"><span>模型质量</span></a>
@@ -148,6 +149,43 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
               </article>
             ))}
           </div>
+        </section>
+
+        <section id="performance" className="admin-grid-row admin-performance-row">
+          <article className="admin-panel admin-performance-panel">
+            <div className="admin-panel-head"><div><h2>服务表现与成本</h2><p>按实际处理方统计请求量、成功率、P95 与可估算成本。</p></div><span className="admin-count">{snapshot.providers.length}</span></div>
+            <div className="admin-performance-list">
+              {snapshot.providers.map((provider) => (
+                <div key={provider.key}>
+                  <span><b>{provider.label}</b><small>{provider.total} 次请求</small></span>
+                  <span><small>成功率</small><b>{provider.successRate === null ? '—' : `${provider.successRate.toFixed(1)}%`}</b></span>
+                  <span><small>P95</small><b>{provider.p95}</b></span>
+                  <span><small>估算成本</small><b>{provider.cost}</b></span>
+                </div>
+              ))}
+              {!snapshot.providers.length && <div className="admin-empty-state">暂无服务调用记录。</div>}
+            </div>
+            <div className="admin-token-strip">
+              <span><small>输入 Token</small><b>{snapshot.usage.inputTokens.toLocaleString('zh-CN')}</b></span>
+              <span><small>输出 Token</small><b>{snapshot.usage.outputTokens.toLocaleString('zh-CN')}</b></span>
+              <span><small>缓存命中</small><b>{snapshot.usage.cacheHitTokens.toLocaleString('zh-CN')}</b></span>
+              <span><small>成本覆盖</small><b>{snapshot.usage.costCoverage}</b></span>
+            </div>
+          </article>
+
+          <article className="admin-panel admin-source-panel">
+            <div className="admin-panel-head"><div><h2>输入来源</h2><p>只记录渠道标签，不记录链接、文件名或材料正文。</p></div></div>
+            <div className="admin-source-list">
+              {snapshot.sources.map((source) => (
+                <div key={source.key}>
+                  <span><b>{source.label}</b><small>{source.successRate === null ? '尚无结果' : `${source.successRate.toFixed(0)}% 成功`}</small></span>
+                  <strong>{source.total}</strong>
+                </div>
+              ))}
+              {!snapshot.sources.length && <div className="admin-empty-state">新请求产生后开始显示来源。</div>}
+            </div>
+            <p className="admin-cost-note">成本为按当前公开单价计算的估算值，不等同于供应商账单；历史请求没有 Token 用量，会显示“未采集”。</p>
+          </article>
         </section>
 
         <section id="product-funnel" className="admin-grid-row admin-product-row">
@@ -225,15 +263,15 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
           </div>
           <div className="admin-table-wrap">
             <table>
-              <thead><tr><th>时间</th><th>请求类型</th><th>处理方式</th><th>耗时</th><th>状态</th></tr></thead>
+              <thead><tr><th>时间</th><th>请求类型</th><th>来源</th><th>处理方式</th><th>耗时</th><th>估算成本</th><th>状态</th></tr></thead>
               <tbody>
                 {visibleRequests.map((item) => (
                   <tr key={item.id}>
-                    <td>{formatEventTime(item.time, true)}</td><td>{item.type}</td><td>{item.model}</td><td>{item.duration}</td>
+                    <td>{formatEventTime(item.time, true)}</td><td>{item.type}</td><td>{item.source}</td><td>{item.model}</td><td>{item.duration}</td><td>{item.cost}</td>
                     <td><span className={item.status === '完成' ? 'status-ok' : 'status-warn'}>{item.status}</span></td>
                   </tr>
                 ))}
-                {!visibleRequests.length && <tr><td colSpan={5}><div className="admin-empty-state">暂无符合条件的请求记录。</div></td></tr>}
+                {!visibleRequests.length && <tr><td colSpan={7}><div className="admin-empty-state">暂无符合条件的请求记录。</div></td></tr>}
               </tbody>
             </table>
           </div>
