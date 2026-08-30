@@ -8,9 +8,14 @@ type Ga4BatchResponse = { reports?: Ga4Report[] };
 
 export type Ga4RangeSnapshot = {
   activeUsers: number;
+  newUsers: number;
   sessions: number;
   views: number;
   engagementRate: number | null;
+  bounceRate: number | null;
+  averageSessionDuration: number;
+  eventCount: number;
+  keyEvents: number;
 };
 
 export type Ga4ReportingData = {
@@ -28,10 +33,18 @@ export type Ga4ReportingData = {
     sessions: number;
     activeUsers: number;
     engagementRate: number | null;
+    keyEvents: number;
   }>;
+  pages: Array<{ key: string; path: string; title: string; views: number; activeUsers: number; engagementSeconds: number }>;
+  events: Array<{ key: string; name: string; count: number; users: number }>;
+  devices: Array<{ key: string; device: string; activeUsers: number; sessions: number; engagementRate: number | null }>;
+  countries: Array<{ key: string; country: string; activeUsers: number; sessions: number }>;
 };
 
-const emptyRange = (): Ga4RangeSnapshot => ({ activeUsers: 0, sessions: 0, views: 0, engagementRate: null });
+const emptyRange = (): Ga4RangeSnapshot => ({
+  activeUsers: 0, newUsers: 0, sessions: 0, views: 0, engagementRate: null,
+  bounceRate: null, averageSessionDuration: 0, eventCount: 0, keyEvents: 0,
+});
 
 function base64Url(value: Uint8Array | string) {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
@@ -87,9 +100,14 @@ function summary(report: Ga4Report | undefined): Ga4RangeSnapshot {
   const row = report?.rows?.[0];
   return {
     activeUsers: numberAt(row, 0),
-    sessions: numberAt(row, 1),
-    views: numberAt(row, 2),
-    engagementRate: row ? numberAt(row, 3) * 100 : null,
+    newUsers: numberAt(row, 1),
+    sessions: numberAt(row, 2),
+    views: numberAt(row, 3),
+    engagementRate: row ? numberAt(row, 4) * 100 : null,
+    bounceRate: row ? numberAt(row, 5) * 100 : null,
+    averageSessionDuration: numberAt(row, 6),
+    eventCount: numberAt(row, 7),
+    keyEvents: numberAt(row, 8),
   };
 }
 
@@ -102,6 +120,10 @@ function emptyData(status: Ga4ReportingData['status'], propertyId: string, messa
     message,
     ranges: { '24h': emptyRange(), '7d': emptyRange(), '30d': emptyRange() },
     channels: [],
+    pages: [],
+    events: [],
+    devices: [],
+    countries: [],
   };
 }
 
@@ -110,33 +132,61 @@ let cache: { key: string; expiresAt: number; value: Promise<Ga4ReportingData> } 
 async function fetchGa4Report(propertyId: string, email: string, privateKey: string): Promise<Ga4ReportingData> {
   try {
     const token = await serviceAccountToken(email, privateKey);
+    const summaryMetrics = [
+      'activeUsers', 'newUsers', 'sessions', 'screenPageViews', 'engagementRate',
+      'bounceRate', 'averageSessionDuration', 'eventCount', 'keyEvents',
+    ];
     const metricRequest = (startDate: string) => ({
       dateRanges: [{ startDate, endDate: 'today' }],
-      metrics: ['activeUsers', 'sessions', 'screenPageViews', 'engagementRate'].map((name) => ({ name })),
+      metrics: summaryMetrics.map((name) => ({ name })),
     });
-    const response = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:batchRunReports`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [
-          metricRequest('today'),
-          metricRequest('7daysAgo'),
-          metricRequest('30daysAgo'),
-          {
-            dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
-            dimensions: ['sessionSource', 'sessionMedium', 'sessionCampaignName'].map((name) => ({ name })),
-            metrics: ['sessions', 'activeUsers', 'engagementRate'].map((name) => ({ name })),
-            orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-            limit: '12',
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(10_000),
+    const endpoint = `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:batchRunReports`;
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const postBatch = (requests: Array<Record<string, unknown>>) => fetch(endpoint, {
+      method: 'POST', headers, body: JSON.stringify({ requests }), signal: AbortSignal.timeout(10_000),
     });
-    if (!response.ok) throw new Error(`report_${response.status}`);
-    const payload = await response.json() as Ga4BatchResponse;
-    const reports = payload.reports ?? [];
-    if (reports.length < 4) throw new Error('report_incomplete');
+    const [primaryResponse, detailResponse] = await Promise.all([
+      postBatch([
+        metricRequest('today'),
+        metricRequest('7daysAgo'),
+        metricRequest('30daysAgo'),
+        {
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dimensions: ['sessionSource', 'sessionMedium', 'sessionCampaignName'].map((name) => ({ name })),
+          metrics: ['sessions', 'activeUsers', 'engagementRate', 'keyEvents'].map((name) => ({ name })),
+          orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: '12',
+        },
+        {
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dimensions: ['pagePathPlusQueryString', 'pageTitle'].map((name) => ({ name })),
+          metrics: ['screenPageViews', 'activeUsers', 'userEngagementDuration'].map((name) => ({ name })),
+          orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }], limit: '10',
+        },
+      ]),
+      postBatch([
+        {
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dimensions: [{ name: 'eventName' }], metrics: ['eventCount', 'totalUsers'].map((name) => ({ name })),
+          orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }], limit: '12',
+        },
+        {
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dimensions: [{ name: 'deviceCategory' }], metrics: ['activeUsers', 'sessions', 'engagementRate'].map((name) => ({ name })),
+          orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }], limit: '8',
+        },
+        {
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dimensions: [{ name: 'country' }], metrics: ['activeUsers', 'sessions'].map((name) => ({ name })),
+          orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }], limit: '10',
+        },
+      ]),
+    ]);
+    if (!primaryResponse.ok || !detailResponse.ok) throw new Error(`report_${primaryResponse.status}_${detailResponse.status}`);
+    const primaryPayload = await primaryResponse.json() as Ga4BatchResponse;
+    const detailPayload = await detailResponse.json() as Ga4BatchResponse;
+    const reports = primaryPayload.reports ?? [];
+    const details = detailPayload.reports ?? [];
+    if (reports.length < 5 || details.length < 3) throw new Error('report_incomplete');
     const channels = (reports[3].rows ?? []).map((row, index) => ({
       key: `${index}-${row.dimensionValues?.map((item) => item.value).join('-') ?? 'unknown'}`,
       source: row.dimensionValues?.[0]?.value || '(direct)',
@@ -145,6 +195,25 @@ async function fetchGa4Report(propertyId: string, email: string, privateKey: str
       sessions: numberAt(row, 0),
       activeUsers: numberAt(row, 1),
       engagementRate: numberAt(row, 2) * 100,
+      keyEvents: numberAt(row, 3),
+    }));
+    const pages = (reports[4].rows ?? []).map((row, index) => ({
+      key: `page-${index}-${row.dimensionValues?.[0]?.value ?? 'unknown'}`,
+      path: row.dimensionValues?.[0]?.value || '/', title: row.dimensionValues?.[1]?.value || '未命名页面',
+      views: numberAt(row, 0), activeUsers: numberAt(row, 1), engagementSeconds: numberAt(row, 2),
+    }));
+    const events = (details[0].rows ?? []).map((row, index) => ({
+      key: `event-${index}-${row.dimensionValues?.[0]?.value ?? 'unknown'}`,
+      name: row.dimensionValues?.[0]?.value || 'unknown', count: numberAt(row, 0), users: numberAt(row, 1),
+    }));
+    const devices = (details[1].rows ?? []).map((row, index) => ({
+      key: `device-${index}-${row.dimensionValues?.[0]?.value ?? 'unknown'}`,
+      device: row.dimensionValues?.[0]?.value || 'unknown', activeUsers: numberAt(row, 0), sessions: numberAt(row, 1),
+      engagementRate: numberAt(row, 2) * 100,
+    }));
+    const countries = (details[2].rows ?? []).map((row, index) => ({
+      key: `country-${index}-${row.dimensionValues?.[0]?.value ?? 'unknown'}`,
+      country: row.dimensionValues?.[0]?.value || 'unknown', activeUsers: numberAt(row, 0), sessions: numberAt(row, 1),
     }));
     return {
       configured: true,
@@ -154,6 +223,10 @@ async function fetchGa4Report(propertyId: string, email: string, privateKey: str
       message: '已连接 Google Analytics Data API',
       ranges: { '24h': summary(reports[0]), '7d': summary(reports[1]), '30d': summary(reports[2]) },
       channels,
+      pages,
+      events,
+      devices,
+      countries,
     };
   } catch (error) {
     console.error('GA4 reporting failed', error instanceof Error ? error.message : 'unknown');
