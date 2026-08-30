@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { OptimizationReview, SuggestionDecision } from '../../components/optimization-review';
-import { ResumeDocument, ResumeTemplate, ReviewBlock } from '../../components/resume-document';
+import { ResumeDocument, ResumeTemplate, ReviewBlock, splitResumeEntry } from '../../components/resume-document';
+import { ResumeStructuredEditor } from '../../components/resume-structured-editor';
 import { SiteFooter } from '../../components/site-footer';
 import { useLanguage } from '../../components/language-context';
 import { EvidenceStatus, isMatchAnalysis, MatchAnalysis } from '../../lib/match-analysis';
@@ -13,7 +14,6 @@ import { fileSizeBucket, trackEvent } from '../../lib/analytics';
 type Screen = 'materials' | 'results' | 'review';
 type InputMode = 'upload' | 'paste';
 type ParseState = 'idle' | 'working' | 'ready' | 'paste_required' | 'error';
-type ReviewMode = 'preview' | 'edit';
 type FeedbackReason = 'helpful' | 'score_unfair' | 'evidence_missed' | 'suggestions_weak' | 'unclear' | 'other';
 
 const ACCEPTED_RESUME_EXTENSIONS = new Set([
@@ -37,6 +37,7 @@ type StoredDraft = {
   suggestionDecisions?: Record<string, SuggestionDecision>;
   suggestionNotes?: Record<string, string>;
   reviewDraft?: string;
+  reviewBlocks?: ReviewBlock[];
   confirmedDraft?: string;
   confirmedAt?: string;
   selectedTemplate?: ResumeTemplate;
@@ -143,14 +144,23 @@ function parseReviewBlocks(value: string): ReviewBlock[] {
     else if (/^(专业技能|核心技能|技能|skills?)$/i.test(currentSection) && REVIEW_SKILL_LABEL.test(line)) kind = 'entry';
     else if (REVIEW_CONTACT.test(line) && line.length < 180) kind = 'contact';
     else if (index === 0 && line.length < 80) kind = 'name';
+    else if (index === 1 && !currentSection && line.length < 140) kind = 'headline';
     else if (/^(正式工作经历|实习经历|工作经历|professional experience|work experience|experience|internships?)$/i.test(currentSection)) kind = 'bullet';
 
     const previous = blocks.at(-1);
     if (kind === 'body' && previous?.kind === 'body' && !/[。！？.!?]$/.test(previous.text)) previous.text = joinPreviewText(previous.text, line);
-    else if (kind === 'bullet' && previous?.kind === 'bullet' && !/[。！？.!?]$/.test(previous.text)) previous.text = joinPreviewText(previous.text, line);
     else blocks.push({ kind, text: line });
   }
   return blocks;
+}
+
+function serializeReviewBlocks(blocks: ReviewBlock[]) {
+  return blocks.map((block) => block.kind === 'bullet' && !block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '').trim() ? '' : block.text.trim()).filter(Boolean).join('\n');
+}
+
+function isReviewBlockArray(value: unknown): value is ReviewBlock[] {
+  const kinds = new Set(['name', 'headline', 'contact', 'section', 'entry', 'bullet', 'body']);
+  return Array.isArray(value) && value.every((item) => item && typeof item === 'object' && kinds.has(String((item as ReviewBlock).kind)) && typeof (item as ReviewBlock).text === 'string');
 }
 
 function escapeHtml(value: string) {
@@ -159,10 +169,15 @@ function escapeHtml(value: string) {
 
 function standaloneResumeHtml(blocks: ReviewBlock[], template: ResumeTemplate, language: 'zh' | 'en') {
   const body = blocks.map((block) => {
-    const text = escapeHtml(block.text.replace(/[:：]$/, ''));
+    const normalized = block.kind === 'bullet' ? block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '') : block.text;
+    if (!normalized.trim()) return '';
+    const text = escapeHtml(normalized.replace(/[:：]$/, ''));
     if (block.kind === 'name') return `<h1>${text}</h1>`;
     if (block.kind === 'section') return `<h2>${text}</h2>`;
-    if (block.kind === 'entry') return `<h3>${text}</h3>`;
+    if (block.kind === 'entry') {
+      const entry = splitResumeEntry(block.text);
+      return `<div class="resume-entry"><h3>${escapeHtml(entry.title)}</h3>${entry.date ? `<span>${escapeHtml(entry.date)}</span>` : ''}</div>`;
+    }
     return `<p class="resume-${block.kind}">${text}</p>`;
   }).join('\n');
   return `<!doctype html>
@@ -177,8 +192,12 @@ function standaloneResumeHtml(blocks: ReviewBlock[], template: ResumeTemplate, l
 body { margin: 0; background: #eef1f6; color: #20242b; font-family: Arial, "Microsoft YaHei", "PingFang SC", sans-serif; }
 .resume { width: 210mm; min-height: 297mm; margin: 18px auto; padding: 17mm 18mm 20mm; background: #fdfdfc; box-shadow: 0 24px 70px rgba(30,48,79,.12); }
 h1 { margin: 0; color: #171b22; font-size: 29px; line-height: 1.12; }
+h1 + .resume-headline { margin-top: 5px; color: #313846; font-size: 11.5px; font-weight: 600; }
 h2 { margin: 26px 0 11px; padding-bottom: 6px; border-bottom: 1px solid #315acb; color: #315acb; font-size: 12px; line-height: 1.35; }
 h3 { margin: 18px 0 8px; color: #202630; font-size: 11.8px; line-height: 1.5; }
+.resume-entry { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: baseline; gap: 16px; margin: 16px 0 6px; break-after: avoid; }
+.resume-entry h3 { margin: 0; }
+.resume-entry span { color: #596272; font-size: 9.3px; white-space: nowrap; }
 h2 + h3 { margin-top: 12px; }
 p { margin: 0 0 7px; font-size: 10.8px; line-height: 1.62; }
 .resume-contact { margin: 8px 0 17px; color: #596272; font-size: 9.5px; }
@@ -186,7 +205,7 @@ p { margin: 0 0 7px; font-size: 10.8px; line-height: 1.62; }
 .resume-bullet::before { content: "•"; color: #647084; font-size: 8px; line-height: 2.05; }
 .template-compact { padding: 13mm 16mm 16mm; }
 .template-compact h2 { margin-top: 19px; }
-.template-compact h3 { margin: 13px 0 5px; }
+.template-compact .resume-entry { margin: 11px 0 4px; }
 .template-compact p { margin-bottom: 4px; font-size: 10.2px; line-height: 1.5; }
 .template-minimal h2 { border-color: #aeb5c0; color: #20242b; letter-spacing: .02em; }
 .template-minimal h3 { font-size: 12px; }
@@ -306,7 +325,7 @@ export default function NewMatchPage() {
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, SuggestionDecision>>({});
   const [suggestionNotes, setSuggestionNotes] = useState<Record<string, string>>({});
   const [reviewDraft, setReviewDraft] = useState('');
-  const [reviewMode, setReviewMode] = useState<ReviewMode>('preview');
+  const [reviewBlocks, setReviewBlocks] = useState<ReviewBlock[]>([]);
   const [confirmedDraft, setConfirmedDraft] = useState('');
   const [confirmedAt, setConfirmedAt] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<ResumeTemplate>('balanced');
@@ -350,7 +369,10 @@ export default function NewMatchPage() {
             setAnalysis(draft.analysis);
             if (draft.suggestionDecisions && typeof draft.suggestionDecisions === 'object') setSuggestionDecisions(draft.suggestionDecisions);
             if (draft.suggestionNotes && typeof draft.suggestionNotes === 'object') setSuggestionNotes(draft.suggestionNotes);
-            if (typeof draft.reviewDraft === 'string') setReviewDraft(draft.reviewDraft);
+            if (typeof draft.reviewDraft === 'string') {
+              setReviewDraft(draft.reviewDraft);
+              setReviewBlocks(isReviewBlockArray(draft.reviewBlocks) ? draft.reviewBlocks : parseReviewBlocks(draft.reviewDraft));
+            }
             if (typeof draft.confirmedDraft === 'string') setConfirmedDraft(draft.confirmedDraft);
             if (typeof draft.confirmedAt === 'string') setConfirmedAt(draft.confirmedAt);
             if (typeof draft.sampleReference === 'string') setSampleReference(draft.sampleReference);
@@ -370,9 +392,9 @@ export default function NewMatchPage() {
 
   useEffect(() => {
     if (!draftRestored) return;
-    const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, suggestionDecisions, suggestionNotes, reviewDraft, confirmedDraft, confirmedAt, selectedTemplate, sampleReference };
+    const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, suggestionDecisions, suggestionNotes, reviewDraft, reviewBlocks, confirmedDraft, confirmedAt, selectedTemplate, sampleReference };
     try { window.sessionStorage.setItem('resumematch-current-draft', JSON.stringify(draft)); } catch { /* Keep the current tab usable if browser storage is unavailable. */ }
-  }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, suggestionDecisions, suggestionNotes, reviewDraft, confirmedDraft, confirmedAt, selectedTemplate, sampleReference]);
+  }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, suggestionDecisions, suggestionNotes, reviewDraft, reviewBlocks, confirmedDraft, confirmedAt, selectedTemplate, sampleReference]);
 
   useEffect(() => {
     if (analysisState !== 'working') return;
@@ -390,7 +412,7 @@ export default function NewMatchPage() {
     if (file.size > 8 * 1024 * 1024) {
       setResumeFile(null); setResumeName(''); setResumeState('error'); setResumeError(t.tooLarge); event.target.value = ''; return;
     }
-    setResumeFile(file); setResumeName(file.name); setResumeText(''); setResumeState('working'); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt(''); resumeReadyTracked.current = false;
+    setResumeFile(file); setResumeName(file.name); setResumeText(''); setResumeState('working'); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt(''); resumeReadyTracked.current = false;
     trackEvent('resume_upload_started', { file_type: fileExtension(file.name), file_size: fileSizeBucket(file.size) });
     try {
       const localText = await readResumeFile(file).catch(() => '');
@@ -425,7 +447,7 @@ export default function NewMatchPage() {
   }
 
   function handleJdEntry(value: string) {
-    setJdEntry(value); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation(''); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    setJdEntry(value); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation(''); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt('');
     if (/^https?:\/\//i.test(value.trim())) { setJdText(''); setJdState('idle'); jdReadyTracked.current = false; }
     else {
       const ready = value.trim().length >= 80;
@@ -436,14 +458,14 @@ export default function NewMatchPage() {
   }
 
   function changeResumeText(value: string) {
-    setResumeText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    setResumeText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt('');
     const ready = value.trim().length >= 80;
     if (ready && !resumeReadyTracked.current) trackEvent('resume_input_ready', { method: resumeMode === 'paste' ? 'paste' : 'edit' });
     resumeReadyTracked.current = ready;
   }
 
   function changeParsedJd(value: string) {
-    setJdText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    setJdText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt('');
     const ready = value.trim().length >= 80;
     if (ready && !jdReadyTracked.current) trackEvent('jd_input_ready', { method: 'edit' });
     jdReadyTracked.current = ready;
@@ -486,7 +508,7 @@ export default function NewMatchPage() {
     .sort((a, b) => (a.importance === 'must' ? 0 : 1) - (b.importance === 'must' ? 0 : 1))
     .slice(0, 3) ?? [];
   const adoptedSuggestions = analysis?.suggestions.filter((item) => suggestionDecisions[item.id] === 'accepted') ?? [];
-  const reviewPreviewBlocks = useMemo(() => parseReviewBlocks(reviewDraft), [reviewDraft]);
+  const reviewPreviewBlocks = reviewBlocks.length ? reviewBlocks : parseReviewBlocks(reviewDraft);
   const confirmedPreviewBlocks = useMemo(() => parseReviewBlocks(confirmedDraft), [confirmedDraft]);
   const templateOptions: Array<{ id: ResumeTemplate; name: string; description: string }> = [
     { id: 'balanced', name: t.templateBalanced, description: t.templateBalancedBody },
@@ -516,9 +538,9 @@ export default function NewMatchPage() {
     let merged = resumeText;
     for (const item of replacements) merged = `${merged.slice(0, item.start)}${item.revised}${merged.slice(item.end)}`;
     setReviewDraft(merged);
+    setReviewBlocks(parseReviewBlocks(merged));
     setConfirmedDraft('');
     setConfirmedAt('');
-    setReviewMode('preview');
     setScreen('review');
     trackEvent('review_draft_built', { adopted_suggestions: adoptedSuggestions.length, template: selectedTemplate });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -528,12 +550,19 @@ export default function NewMatchPage() {
     if (reviewDraft.trim().length < 80) return;
     setConfirmedDraft(reviewDraft);
     setConfirmedAt(new Date().toISOString());
-    setReviewMode('preview');
     trackEvent('review_draft_confirmed', { adopted_suggestions: adoptedSuggestions.length, template: selectedTemplate });
   }
 
   function editReviewDraft(value: string) {
     setReviewDraft(value);
+    setReviewBlocks(parseReviewBlocks(value));
+    setConfirmedDraft('');
+    setConfirmedAt('');
+  }
+
+  function editReviewBlocks(value: ReviewBlock[]) {
+    setReviewBlocks(value);
+    setReviewDraft(serializeReviewBlocks(value));
     setConfirmedDraft('');
     setConfirmedAt('');
   }
@@ -567,7 +596,7 @@ export default function NewMatchPage() {
 
   async function runAiAnalysis() {
     if (!resumeReady || !jdReady || analysisState === 'working') return;
-    setAnalysisSeconds(0); setAnalysisState('working'); setAnalysisError(''); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setConfirmedDraft(''); setConfirmedAt('');
+    setAnalysisSeconds(0); setAnalysisState('working'); setAnalysisError(''); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt('');
     trackEvent('analysis_started', { resume_method: resumeMode, jd_method: looksLikeUrl ? 'url' : 'paste', language });
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 70_000);
@@ -730,20 +759,14 @@ export default function NewMatchPage() {
             <p className={draftConfirmed ? 'draft-status is-confirmed' : 'draft-status'}>{draftConfirmed ? `${t.confirmedEyebrow} · ${new Date(confirmedAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', { hour12: false })}` : t.reviewWarning}</p>
           </div>
           <div className="text-review-grid">
-            <aside className="adopted-change-list"><header><h2>{t.reviewChanges}</h2><span>{adoptedSuggestions.length}</span></header>{adoptedSuggestions.length ? adoptedSuggestions.map((suggestion, index) => <details key={suggestion.id}><summary><span>{String(index + 1).padStart(2, '0')}</span>{suggestion.targetSection}</summary><div><small>{t.reviewOriginal}</small><p>{suggestion.originalText}</p><small>{t.reviewFinal}</small><p>{suggestionNotes[suggestion.id] ?? suggestion.revisedText}</p></div></details>) : <p className="adopted-change-empty">{t.reviewNoChanges}</p>}</aside>
-            <section className="review-stage" aria-label={t.reviewCanvas}>
-              <div className="review-toolbar">
-                <div className="review-view-switch" role="group" aria-label={t.reviewCanvas}>
-                  <button type="button" className={reviewMode === 'preview' ? 'is-active' : ''} aria-pressed={reviewMode === 'preview'} onClick={() => setReviewMode('preview')}>{t.reviewPreview}</button>
-                  <button type="button" className={reviewMode === 'edit' ? 'is-active' : ''} aria-pressed={reviewMode === 'edit'} onClick={() => setReviewMode('edit')}>{t.reviewEdit}</button>
-                </div>
-                <small>{reviewDraft.length.toLocaleString()} {t.reviewCharacters}</small>
-              </div>
-              {reviewMode === 'preview' ? <>
-                <p className="review-preview-hint">{t.reviewPreviewHint}</p>
-                <ResumeDocument blocks={reviewPreviewBlocks} template={selectedTemplate} className="export-document" />
-              </> : <label className="full-draft-editor"><span>{t.reviewFinal}</span><textarea value={reviewDraft} rows={36} onChange={(event) => editReviewDraft(event.target.value)} /></label>}
+            <section className="review-editor-column" aria-label={t.reviewEdit}>
+              <details className="adopted-change-list"><summary><strong>{t.reviewChanges}</strong><span>{adoptedSuggestions.length}</span></summary><div>{adoptedSuggestions.length ? adoptedSuggestions.map((suggestion, index) => <details key={suggestion.id}><summary><span>{String(index + 1).padStart(2, '0')}</span>{suggestion.targetSection}</summary><div><small>{t.reviewOriginal}</small><p>{suggestion.originalText}</p><small>{t.reviewFinal}</small><p>{suggestionNotes[suggestion.id] ?? suggestion.revisedText}</p></div></details>) : <p className="adopted-change-empty">{t.reviewNoChanges}</p>}</div></details>
+              <ResumeStructuredEditor blocks={reviewPreviewBlocks} language={language} onChange={editReviewBlocks} rawValue={reviewDraft} onRawChange={editReviewDraft} />
             </section>
+            <aside className="review-preview-column" aria-label={t.reviewCanvas}>
+              <div className="review-toolbar"><div><strong>{t.reviewPreview}</strong><small>{t.reviewPreviewHint}</small></div><span>{reviewDraft.length.toLocaleString()} {t.reviewCharacters}</span></div>
+              <div className="review-stage"><ResumeDocument blocks={reviewPreviewBlocks} template={selectedTemplate} className="export-document" /></div>
+            </aside>
           </div>
           <div className="text-review-actions">
             <button type="button" onClick={() => setScreen('results')}><span aria-hidden="true">←</span>{t.reviewBack}</button>
