@@ -16,6 +16,7 @@ export type ProductAnalyticsSnapshot = {
   acquisition: {
     coverage: string;
     channels: Array<{ key: string; label: string; visits: number; starts: number; completions: number; completionRate: number | null }>;
+    campaigns: Array<{ key: string; source: string; medium: string; campaign: string; visits: number; starts: number; completions: number; completionRate: number | null }>;
   };
 };
 
@@ -272,14 +273,26 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
   const journeyIds = new Set(journeyRows.map((row) => stringProperty(row, 'journey_id')));
   const unattributedPageViews = current.filter((row) => row.event_name === 'page_view' && !stringProperty(row, 'journey_id')).length;
   const channelMap = new Map<string, { visits: Set<string>; starts: Set<string>; completions: Set<string> }>();
+  const campaignMap = new Map<string, { source: string; medium: string; campaign: string; visits: Set<string>; starts: Set<string>; completions: Set<string> }>();
   for (const row of journeyRows) {
     const journeyId = stringProperty(row, 'journey_id');
     const source = stringProperty(row, 'acquisition_source') || 'direct';
+    const medium = stringProperty(row, 'acquisition_medium') || 'none';
+    const campaign = stringProperty(row, 'acquisition_campaign') || '未设置';
     const channel = channelMap.get(source) ?? { visits: new Set<string>(), starts: new Set<string>(), completions: new Set<string>() };
     if (row.event_name === 'page_view') channel.visits.add(journeyId);
     if (row.event_name === 'analysis_started') channel.starts.add(journeyId);
     if (row.event_name === 'analysis_completed') channel.completions.add(journeyId);
     channelMap.set(source, channel);
+
+    const campaignKey = `${source}\u0000${medium}\u0000${campaign}`;
+    const campaignGroup = campaignMap.get(campaignKey) ?? {
+      source, medium, campaign, visits: new Set<string>(), starts: new Set<string>(), completions: new Set<string>(),
+    };
+    if (row.event_name === 'page_view') campaignGroup.visits.add(journeyId);
+    if (row.event_name === 'analysis_started') campaignGroup.starts.add(journeyId);
+    if (row.event_name === 'analysis_completed') campaignGroup.completions.add(journeyId);
+    campaignMap.set(campaignKey, campaignGroup);
   }
   const channels = [...channelMap.entries()].map(([key, channel]) => ({
     key,
@@ -289,6 +302,16 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
     completions: channel.completions.size,
     completionRate: percent(channel.completions.size, channel.visits.size),
   })).sort((a, b) => b.completions - a.completions || b.visits - a.visits).slice(0, 8);
+  const campaigns = [...campaignMap.entries()].map(([key, item]) => ({
+    key,
+    source: item.source,
+    medium: item.medium,
+    campaign: item.campaign,
+    visits: item.visits.size,
+    starts: item.starts.size,
+    completions: item.completions.size,
+    completionRate: percent(item.completions.size, item.visits.size),
+  })).sort((a, b) => b.completions - a.completions || b.visits - a.visits).slice(0, 12);
 
   return {
     kpis: [
@@ -314,6 +337,7 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
     acquisition: {
       coverage: journeyIds.size ? `${journeyIds.size} 个新访问旅程${unattributedPageViews ? ` · ${unattributedPageViews} 次历史访问未归因` : ''}` : '新访问开始后累计',
       channels,
+      campaigns,
     },
   };
 }

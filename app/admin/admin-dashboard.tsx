@@ -266,6 +266,17 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
               ))}
               {!productSnapshot.acquisition.channels.length && <div className="admin-empty-state">带来源的新访问进入后，这里会显示渠道完成率。</div>}
             </div>
+            {!!productSnapshot.acquisition.campaigns.length && <details className="admin-campaign-detail">
+              <summary><span>活动明细</span><small>{productSnapshot.acquisition.campaigns.length} 组</small></summary>
+              <div className="admin-campaign-table-wrap">
+                <table>
+                  <thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>访问</th><th>发起</th><th>完成</th><th>完成率</th></tr></thead>
+                  <tbody>{productSnapshot.acquisition.campaigns.map((item) => <tr key={item.key}>
+                    <td>{item.source}</td><td>{item.medium}</td><td>{item.campaign}</td><td>{item.visits}</td><td>{item.starts}</td><td>{item.completions}</td><td>{item.completionRate === null ? '—' : `${item.completionRate.toFixed(0)}%`}</td>
+                  </tr>)}</tbody>
+                </table>
+              </div>
+            </details>}
             <details className="admin-utm-builder">
               <summary><span>生成渠道链接</span><small>模板或自定义</small></summary>
               <div className="admin-utm-controls">
