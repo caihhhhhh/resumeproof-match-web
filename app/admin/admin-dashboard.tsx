@@ -33,8 +33,8 @@ const utmChannels = [
   { label: '邮件', source: 'email', medium: 'email' },
 ] as const;
 
-function safeCampaign(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9._+-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48) || 'campaign';
+function safeUtmValue(value: string, fallback: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9._+-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48) || fallback;
 }
 
 function formatEventTime(value: number | null, includeDate = false) {
@@ -55,18 +55,28 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
   const [range, setRange] = useState<AdminRangeKey>('24h');
   const [search, setSearch] = useState('');
   const [utmChannel, setUtmChannel] = useState(0);
+  const [utmSource, setUtmSource] = useState('reddit');
+  const [utmMedium, setUtmMedium] = useState('community');
   const [utmCampaign, setUtmCampaign] = useState('launch_202608');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const snapshot = runtimeData.ranges[range];
   const productSnapshot = runtimeData.productRanges[range];
   const feedbackSnapshot = runtimeData.feedbackRanges[range];
   const productStepMax = Math.max(1, ...productSnapshot.steps.map((step) => step.count));
-  const selectedUtmChannel = utmChannels[utmChannel];
   const utmUrl = `${siteOrigin}/?${new URLSearchParams({
-    utm_source: selectedUtmChannel.source,
-    utm_medium: selectedUtmChannel.medium,
-    utm_campaign: safeCampaign(utmCampaign),
+    utm_source: safeUtmValue(utmSource, 'source'),
+    utm_medium: safeUtmValue(utmMedium, 'medium'),
+    utm_campaign: safeUtmValue(utmCampaign, 'campaign'),
   }).toString()}`;
+
+  function applyUtmTemplate(index: number) {
+    setUtmChannel(index);
+    if (index >= 0) {
+      setUtmSource(utmChannels[index].source);
+      setUtmMedium(utmChannels[index].medium);
+    }
+    setCopyState('idle');
+  }
 
   async function copyUtmUrl() {
     try {
@@ -257,13 +267,15 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
               {!productSnapshot.acquisition.channels.length && <div className="admin-empty-state">带来源的新访问进入后，这里会显示渠道完成率。</div>}
             </div>
             <details className="admin-utm-builder">
-              <summary><span>生成渠道链接</span><small>选择渠道并复制</small></summary>
+              <summary><span>生成渠道链接</span><small>模板或自定义</small></summary>
               <div className="admin-utm-controls">
-                <label><span>渠道</span><select value={utmChannel} onChange={(event) => { setUtmChannel(Number(event.target.value)); setCopyState('idle'); }}>{utmChannels.map((channel, index) => <option value={index} key={channel.source}>{channel.label}</option>)}</select></label>
+                <label><span>渠道模板</span><select value={utmChannel} onChange={(event) => applyUtmTemplate(Number(event.target.value))}><option value={-1}>自定义</option>{utmChannels.map((channel, index) => <option value={index} key={channel.source}>{channel.label}</option>)}</select></label>
+                <label><span>Source</span><input value={utmSource} onChange={(event) => { setUtmSource(event.target.value); setUtmChannel(-1); setCopyState('idle'); }} maxLength={48} /></label>
+                <label><span>Medium</span><input value={utmMedium} onChange={(event) => { setUtmMedium(event.target.value); setUtmChannel(-1); setCopyState('idle'); }} maxLength={48} /></label>
                 <label><span>Campaign</span><input value={utmCampaign} onChange={(event) => { setUtmCampaign(event.target.value); setCopyState('idle'); }} maxLength={48} /></label>
               </div>
               <div className="admin-utm-output"><input value={utmUrl} readOnly aria-label="生成的 UTM 链接" /><button type="button" onClick={copyUtmUrl}>{copyState === 'copied' ? '已复制' : copyState === 'failed' ? '手动复制' : '复制链接'}</button></div>
-              <p>Campaign 会自动转换为小写与下划线格式。只保存渠道标签和当前标签页随机旅程编号。</p>
+              <p>Source、Medium 和 Campaign 都可以自定义，并会自动转换为小写与下划线格式。</p>
             </details>
           </article>
         </section>
