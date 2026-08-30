@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { OptimizationReview, SuggestionDecision } from '../../components/optimization-review';
 import { ResumeDocument, ResumeTemplate, ReviewBlock, splitResumeEntry } from '../../components/resume-document';
 import { ResumeStructuredEditor } from '../../components/resume-structured-editor';
@@ -64,10 +64,10 @@ const copy = {
     statusStrong: '已证实', statusPartial: '部分证据', statusGap: '尚无证据', noMatchedTerms: '暂无可核对原句', coveredTitle: '已有优势', missingTitle: '优先补证',
     missingAdvice: '只补充真实做过的项目、动作或结果；没有经历就保留为差距。', metricSignals: '份量化结果已识别', localRules: 'AI 语义诊断 · 原句证据校验', evidenceQuote: '简历证据', whyMatch: '判断依据',
     feedbackTitle: '这份分析对你有帮助吗？', feedbackBody: '只记录选择，不记录简历或 JD 内容。', feedbackYes: '有帮助', feedbackNo: '不太准', feedbackWhy: '主要问题是', feedbackThanks: '收到，感谢你的反馈。', feedbackError: '暂时无法提交，请稍后再试。', feedbackScore: '评分不合理', feedbackEvidence: '漏掉已有经历', feedbackSuggestions: '建议不实用', feedbackUnclear: '解释不清楚', feedbackOther: '其他',
-    reviewEyebrow: '完整文字审核稿', reviewTitle: '读顺全文，选好版式再导出。', reviewBody: '这里只合并你明确采用的建议。你可以继续编辑全文和切换版式；确认前不会创建任何文件。', reviewChanges: '本轮已采用修改', reviewOriginal: '原文', reviewFinal: '审核稿', reviewCharacters: '字符', reviewWarning: '请重点核对公司、职位、日期、数字和专有名词。确认文字稿后，本页会立即开放 HTML 与 PDF 导出。', reviewBack: '返回建议审核', reviewNext: '确认并锁定文字稿', reviewPreview: '排版预览', reviewEdit: '编辑文字', reviewPreviewHint: '预览只调整视觉层级与空白，不改变审核稿内容。', reviewNoChanges: '本轮没有采用 AI 改写，当前显示原始简历全文。', reviewCanvas: '文字排版预览',
+    reviewEyebrow: '完整文字审核稿', reviewTitle: '读顺全文，选好版式再导出。', reviewBody: '这里只合并你明确采用的建议。你可以继续编辑全文和切换版式；确认前不会创建任何文件。', reviewChanges: '本轮已采用修改', reviewOriginal: '原文', reviewFinal: '审核稿', reviewCharacters: '字符', reviewWarning: '请重点核对公司、职位、日期、数字和专有名词。确认文字稿后，本页会立即开放 HTML 与 PDF 导出。', reviewBack: '返回建议审核', reviewNext: '确认并锁定文字稿', reviewPreview: '排版预览', reviewEdit: '编辑文字', reviewPreviewHint: '预览只调整视觉层级与空白，不改变审核稿内容。', reviewNoChanges: '本轮没有采用 AI 改写，当前显示原始简历全文。', reviewCanvas: '文字排版预览', reviewPage: '页', reviewPagesApprox: '预计', reviewIncomplete: '项待填写', reviewLong: '内容可能超过两页，建议切换紧凑版或精简次要信息。',
     confirmedEyebrow: '文字审核已完成', confirmedTitle: '这份文字稿已锁定。', confirmedBody: '系统保存了当前全文快照。返回修改任何文字后，本次确认会自动失效；此操作不会生成 HTML、PDF 或其他文件。', confirmedSnapshot: '已确认全文', confirmedChanges: '采用修改', confirmedTime: '确认时间', confirmedEdit: '返回继续编辑', confirmedNext: '选择简历模板', confirmedNextHint: '先选择版式，不会立即生成文件。',
     templateEyebrow: '选择版式', templateTitle: '内容不变，只调整阅读节奏。', templateBody: '三个模板共用已确认文字。切换模板不会重写内容，也不会影响匹配报告。', templateBalanced: '均衡单栏', templateBalancedBody: '清晰分区与舒适行距，适合大多数岗位。', templateCompact: '紧凑单栏', templateCompactBody: '缩小段间距，适合经历较多或希望控制页数的简历。', templateMinimal: '极简单栏', templateMinimalBody: '弱化颜色和边框，让公司、岗位与成果成为重点。', templateSelected: '已选择', templateBack: '返回确认记录', templateContinue: '进入最终预览',
-    exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。HTML 可继续编辑；打印时在系统窗口选择“另存为 PDF”。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '打印 / 保存 PDF', exportPrintHint: '打印建议：A4、默认边距、背景图形开启。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成',
+    exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。HTML 可继续编辑；打印时在系统窗口选择“另存为 PDF”。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '打印 / 保存 PDF', exportAnother: '用当前简历匹配新岗位', exportPrintHint: '打印建议：A4、默认边距、背景图形开启。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成',
   },
   en: {
     back: 'Back home', workspaceTitle: 'Put both sources in one place.', workspaceBody: 'Files are read in your browser and kept only for this tab. Resume and JD text is sent to the AI service after you start analysis; scanned files use visual recognition.',
@@ -87,10 +87,10 @@ const copy = {
     statusStrong: 'Supported', statusPartial: 'Partial evidence', statusGap: 'No evidence yet', noMatchedTerms: 'No verified excerpt yet', coveredTitle: 'Current strengths', missingTitle: 'Evidence to add first',
     missingAdvice: 'Add only projects, actions, or outcomes you actually have. If the experience does not exist, keep it as a gap.', metricSignals: 'quantified results detected', localRules: 'AI semantic diagnostic · source evidence verified', evidenceQuote: 'Resume evidence', whyMatch: 'Reasoning',
     feedbackTitle: 'Was this analysis useful?', feedbackBody: 'Only your selection is stored. Resume and JD content are not included.', feedbackYes: 'Useful', feedbackNo: 'Not accurate', feedbackWhy: 'Main issue', feedbackThanks: 'Thanks, your feedback was received.', feedbackError: 'Feedback could not be submitted. Try again later.', feedbackScore: 'Score feels wrong', feedbackEvidence: 'Missed existing evidence', feedbackSuggestions: 'Suggestions are weak', feedbackUnclear: 'Explanation is unclear', feedbackOther: 'Other',
-    reviewEyebrow: 'Full text review', reviewTitle: 'Read it through, choose a layout, then export.', reviewBody: 'Only suggestions you explicitly adopted are merged here. Keep editing or switch layouts; no file is created before confirmation.', reviewChanges: 'Adopted changes', reviewOriginal: 'Original', reviewFinal: 'Review draft', reviewCharacters: 'characters', reviewWarning: 'Verify company names, titles, dates, metrics, and proper nouns. Confirming the text unlocks HTML and PDF export on this page.', reviewBack: 'Back to suggestions', reviewNext: 'Confirm and lock text', reviewPreview: 'Layout preview', reviewEdit: 'Edit text', reviewPreviewHint: 'The preview changes hierarchy and spacing only. Draft content stays unchanged.', reviewNoChanges: 'No AI rewrite was adopted. The original resume is shown in full.', reviewCanvas: 'Text layout preview',
+    reviewEyebrow: 'Full text review', reviewTitle: 'Read it through, choose a layout, then export.', reviewBody: 'Only suggestions you explicitly adopted are merged here. Keep editing or switch layouts; no file is created before confirmation.', reviewChanges: 'Adopted changes', reviewOriginal: 'Original', reviewFinal: 'Review draft', reviewCharacters: 'characters', reviewWarning: 'Verify company names, titles, dates, metrics, and proper nouns. Confirming the text unlocks HTML and PDF export on this page.', reviewBack: 'Back to suggestions', reviewNext: 'Confirm and lock text', reviewPreview: 'Layout preview', reviewEdit: 'Edit text', reviewPreviewHint: 'The preview changes hierarchy and spacing only. Draft content stays unchanged.', reviewNoChanges: 'No AI rewrite was adopted. The original resume is shown in full.', reviewCanvas: 'Text layout preview', reviewPage: 'page', reviewPagesApprox: 'About', reviewIncomplete: 'fields to complete', reviewLong: 'This may run beyond two pages. Try the compact layout or trim lower-priority details.',
     confirmedEyebrow: 'Text review complete', confirmedTitle: 'This draft is now locked.', confirmedBody: 'The complete text snapshot has been saved. Editing any text will invalidate this confirmation. No HTML, PDF, or other file is created here.', confirmedSnapshot: 'Confirmed text', confirmedChanges: 'adopted changes', confirmedTime: 'Confirmed at', confirmedEdit: 'Return to edit', confirmedNext: 'Choose a template', confirmedNextHint: 'Choose the layout first. No file is generated yet.',
     templateEyebrow: 'Choose a layout', templateTitle: 'Keep the content. Change the reading rhythm.', templateBody: 'All three templates use the confirmed text. Switching layouts does not rewrite the resume or change the match report.', templateBalanced: 'Balanced single column', templateBalancedBody: 'Clear sections and comfortable spacing for most roles.', templateCompact: 'Compact single column', templateCompactBody: 'Tighter spacing for longer resumes or stricter page limits.', templateMinimal: 'Minimal single column', templateMinimalBody: 'Less color and fewer rules, with focus on roles and outcomes.', templateSelected: 'Selected', templateBack: 'Back to confirmation', templateContinue: 'Open final preview',
-    exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout. The HTML remains editable; use the system print dialog to save a PDF.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Print / save PDF', exportPrintHint: 'Recommended print settings: A4, default margins, background graphics on.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready',
+    exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout. The HTML remains editable; use the system print dialog to save a PDF.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Print / save PDF', exportAnother: 'Match this resume to another job', exportPrintHint: 'Recommended print settings: A4, default margins, background graphics on.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready',
   },
 } as const;
 
@@ -158,6 +158,15 @@ function serializeReviewBlocks(blocks: ReviewBlock[]) {
   return blocks.map((block) => block.kind === 'bullet' && !block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '').trim() ? '' : block.text.trim()).filter(Boolean).join('\n');
 }
 
+function isBlankReviewBlock(block: ReviewBlock) {
+  const value = block.kind === 'bullet' ? block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '') : block.text;
+  return !value.trim();
+}
+
+function sameReviewBlocks(left: ReviewBlock[], right: ReviewBlock[]) {
+  return left.length === right.length && left.every((block, index) => block.kind === right[index]?.kind && block.text === right[index]?.text);
+}
+
 function isReviewBlockArray(value: unknown): value is ReviewBlock[] {
   const kinds = new Set(['name', 'headline', 'contact', 'section', 'entry', 'bullet', 'body']);
   return Array.isArray(value) && value.every((item) => item && typeof item === 'object' && kinds.has(String((item as ReviewBlock).kind)) && typeof (item as ReviewBlock).text === 'string');
@@ -195,7 +204,7 @@ h1 { margin: 0; color: #171b22; font-size: 29px; line-height: 1.12; }
 h1 + .resume-headline { margin-top: 5px; color: #313846; font-size: 11.5px; font-weight: 600; }
 h2 { margin: 26px 0 11px; padding-bottom: 6px; border-bottom: 1px solid #315acb; color: #315acb; font-size: 12px; line-height: 1.35; }
 h3 { margin: 18px 0 8px; color: #202630; font-size: 11.8px; line-height: 1.5; }
-.resume-entry { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: baseline; gap: 16px; margin: 16px 0 6px; break-after: avoid; }
+.resume-entry { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: baseline; gap: 16px; margin: 16px 0 6px; break-after: avoid; break-inside: avoid-page; }
 .resume-entry h3 { margin: 0; }
 .resume-entry span { color: #596272; font-size: 9.3px; white-space: nowrap; }
 h2 + h3 { margin-top: 12px; }
@@ -334,8 +343,13 @@ export default function NewMatchPage() {
   const [sampleDeleted, setSampleDeleted] = useState(false);
   const [feedbackIntent, setFeedbackIntent] = useState<'idle' | 'negative'>('idle');
   const [feedbackState, setFeedbackState] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
+  const [previewPages, setPreviewPages] = useState(1);
   const resumeReadyTracked = useRef(false);
   const jdReadyTracked = useRef(false);
+  const reviewUndoRef = useRef<ReviewBlock[][]>([]);
+  const reviewRedoRef = useRef<ReviewBlock[][]>([]);
+  const reviewMergeAtRef = useRef(0);
+  const previewMeasureRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -395,6 +409,21 @@ export default function NewMatchPage() {
     const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, suggestionDecisions, suggestionNotes, reviewDraft, reviewBlocks, confirmedDraft, confirmedAt, selectedTemplate, sampleReference };
     try { window.sessionStorage.setItem('resumematch-current-draft', JSON.stringify(draft)); } catch { /* Keep the current tab usable if browser storage is unavailable. */ }
   }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, suggestionDecisions, suggestionNotes, reviewDraft, reviewBlocks, confirmedDraft, confirmedAt, selectedTemplate, sampleReference]);
+
+  useEffect(() => {
+    if (screen !== 'review') return;
+    const paper = previewMeasureRef.current?.querySelector<HTMLElement>('.resume-paper');
+    if (!paper) return;
+    const measure = () => {
+      const pageHeight = Math.max(1, paper.clientWidth * (297 / 210));
+      setPreviewPages(Math.max(1, Math.ceil(paper.scrollHeight / pageHeight)));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(paper);
+    return () => observer.disconnect();
+  }, [screen, reviewBlocks, reviewDraft, selectedTemplate]);
 
   useEffect(() => {
     if (analysisState !== 'working') return;
@@ -509,13 +538,15 @@ export default function NewMatchPage() {
     .slice(0, 3) ?? [];
   const adoptedSuggestions = analysis?.suggestions.filter((item) => suggestionDecisions[item.id] === 'accepted') ?? [];
   const reviewPreviewBlocks = reviewBlocks.length ? reviewBlocks : parseReviewBlocks(reviewDraft);
-  const confirmedPreviewBlocks = useMemo(() => parseReviewBlocks(confirmedDraft), [confirmedDraft]);
+  const incompleteReviewBlocks = reviewPreviewBlocks.filter(isBlankReviewBlock).length;
+  const reviewReady = reviewDraft.trim().length >= 80 && incompleteReviewBlocks === 0;
   const templateOptions: Array<{ id: ResumeTemplate; name: string; description: string }> = [
     { id: 'balanced', name: t.templateBalanced, description: t.templateBalancedBody },
     { id: 'compact', name: t.templateCompact, description: t.templateCompactBody },
     { id: 'minimal', name: t.templateMinimal, description: t.templateMinimalBody },
   ];
   const draftConfirmed = confirmedDraft.length >= 80 && confirmedDraft === reviewDraft;
+  const confirmedPreviewBlocks = draftConfirmed ? reviewPreviewBlocks : parseReviewBlocks(confirmedDraft);
 
   function buildTextReview() {
     if (!analysis) return;
@@ -539,6 +570,9 @@ export default function NewMatchPage() {
     for (const item of replacements) merged = `${merged.slice(0, item.start)}${item.revised}${merged.slice(item.end)}`;
     setReviewDraft(merged);
     setReviewBlocks(parseReviewBlocks(merged));
+    reviewUndoRef.current = [];
+    reviewRedoRef.current = [];
+    reviewMergeAtRef.current = 0;
     setConfirmedDraft('');
     setConfirmedAt('');
     setScreen('review');
@@ -547,24 +581,57 @@ export default function NewMatchPage() {
   }
 
   function confirmTextDraft() {
-    if (reviewDraft.trim().length < 80) return;
+    if (!reviewReady) return;
     setConfirmedDraft(reviewDraft);
     setConfirmedAt(new Date().toISOString());
     trackEvent('review_draft_confirmed', { adopted_suggestions: adoptedSuggestions.length, template: selectedTemplate });
   }
 
   function editReviewDraft(value: string) {
-    setReviewDraft(value);
-    setReviewBlocks(parseReviewBlocks(value));
+    applyReviewBlocks(parseReviewBlocks(value), 'merge', value);
+  }
+
+  function applyReviewBlocks(value: ReviewBlock[], mode: 'merge' | 'checkpoint' = 'merge', draft = serializeReviewBlocks(value)) {
+    if (sameReviewBlocks(value, reviewBlocks)) return;
+    const now = Date.now();
+    const shouldCheckpoint = mode === 'checkpoint' || now - reviewMergeAtRef.current > 750 || reviewUndoRef.current.length === 0;
+    if (shouldCheckpoint && reviewBlocks.length) {
+      reviewUndoRef.current = [...reviewUndoRef.current.slice(-39), reviewBlocks.map((block) => ({ ...block }))];
+    }
+    reviewMergeAtRef.current = mode === 'merge' ? now : 0;
+    reviewRedoRef.current = [];
+    setReviewBlocks(value);
+    setReviewDraft(draft);
     setConfirmedDraft('');
     setConfirmedAt('');
   }
 
-  function editReviewBlocks(value: ReviewBlock[]) {
-    setReviewBlocks(value);
-    setReviewDraft(serializeReviewBlocks(value));
+  function editReviewBlocks(value: ReviewBlock[], mode: 'merge' | 'checkpoint' = 'merge') {
+    applyReviewBlocks(value, mode);
+  }
+
+  function undoReviewEdit() {
+    const previous = reviewUndoRef.current.at(-1);
+    if (!previous) return;
+    reviewUndoRef.current = reviewUndoRef.current.slice(0, -1);
+    reviewRedoRef.current = [...reviewRedoRef.current.slice(-39), reviewBlocks.map((block) => ({ ...block }))];
+    setReviewBlocks(previous);
+    setReviewDraft(serializeReviewBlocks(previous));
     setConfirmedDraft('');
     setConfirmedAt('');
+    reviewMergeAtRef.current = 0;
+  }
+
+  function redoReviewEdit() {
+    const next = reviewRedoRef.current.at(-1);
+    if (!next) return;
+    reviewRedoRef.current = reviewRedoRef.current.slice(0, -1);
+    reviewUndoRef.current = [...reviewUndoRef.current.slice(-39), reviewBlocks.map((block) => ({ ...block }))];
+    setReviewBlocks(next);
+    setReviewDraft(serializeReviewBlocks(next));
+    setConfirmedDraft('');
+    setConfirmedAt('');
+    reviewMergeAtRef.current = 0;
   }
 
   function resumeFileBase() {
@@ -592,6 +659,37 @@ export default function NewMatchPage() {
     window.print();
     document.title = previousTitle;
     trackEvent('resume_exported', { format: 'print_pdf', template: selectedTemplate });
+  }
+
+  function startAnotherMatch() {
+    const nextResume = confirmedDraft || reviewDraft || resumeText;
+    setResumeMode('paste');
+    setResumeFile(null);
+    setResumeName('');
+    setResumeText(nextResume);
+    setResumeState(nextResume.trim().length >= 80 ? 'ready' : 'idle');
+    setJdEntry('');
+    setJdText('');
+    setJdSource('');
+    setJdState('idle');
+    setJdMessage('');
+    setJobTitle('');
+    setJobCompany('');
+    setJobLocation('');
+    setAnalysis(null);
+    setSuggestionDecisions({});
+    setSuggestionNotes({});
+    setReviewDraft('');
+    setReviewBlocks([]);
+    setConfirmedDraft('');
+    setConfirmedAt('');
+    reviewUndoRef.current = [];
+    reviewRedoRef.current = [];
+    resumeReadyTracked.current = nextResume.trim().length >= 80;
+    jdReadyTracked.current = false;
+    setScreen('materials');
+    trackEvent('new_match_started', { resume_source: 'confirmed_draft' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function runAiAnalysis() {
@@ -761,19 +859,21 @@ export default function NewMatchPage() {
           <div className="text-review-grid">
             <section className="review-editor-column" aria-label={t.reviewEdit}>
               <details className="adopted-change-list"><summary><strong>{t.reviewChanges}</strong><span>{adoptedSuggestions.length}</span></summary><div>{adoptedSuggestions.length ? adoptedSuggestions.map((suggestion, index) => <details key={suggestion.id}><summary><span>{String(index + 1).padStart(2, '0')}</span>{suggestion.targetSection}</summary><div><small>{t.reviewOriginal}</small><p>{suggestion.originalText}</p><small>{t.reviewFinal}</small><p>{suggestionNotes[suggestion.id] ?? suggestion.revisedText}</p></div></details>) : <p className="adopted-change-empty">{t.reviewNoChanges}</p>}</div></details>
-              <ResumeStructuredEditor blocks={reviewPreviewBlocks} language={language} onChange={editReviewBlocks} rawValue={reviewDraft} onRawChange={editReviewDraft} />
+              <ResumeStructuredEditor blocks={reviewPreviewBlocks} language={language} onChange={editReviewBlocks} rawValue={reviewDraft} onRawChange={editReviewDraft} canUndo={reviewUndoRef.current.length > 0} canRedo={reviewRedoRef.current.length > 0} onUndo={undoReviewEdit} onRedo={redoReviewEdit} />
             </section>
             <aside className="review-preview-column" aria-label={t.reviewCanvas}>
-              <div className="review-toolbar"><div><strong>{t.reviewPreview}</strong><small>{t.reviewPreviewHint}</small></div><span>{reviewDraft.length.toLocaleString()} {t.reviewCharacters}</span></div>
-              <div className="review-stage"><ResumeDocument blocks={reviewPreviewBlocks} template={selectedTemplate} className="export-document" /></div>
+              <div className="review-toolbar"><div><strong>{t.reviewPreview}</strong><small>{t.reviewPreviewHint}</small></div><span>{t.reviewPagesApprox} {previewPages} {language === 'en' && previewPages !== 1 ? 'pages' : t.reviewPage} · {reviewDraft.length.toLocaleString()} {t.reviewCharacters}</span></div>
+              {(incompleteReviewBlocks > 0 || previewPages > 2) && <div className={incompleteReviewBlocks > 0 ? 'review-quality-status is-warning' : 'review-quality-status'} role="status">{incompleteReviewBlocks > 0 ? `${incompleteReviewBlocks} ${t.reviewIncomplete}` : t.reviewLong}</div>}
+              <div className="review-stage" ref={previewMeasureRef}><ResumeDocument blocks={reviewPreviewBlocks} template={selectedTemplate} className="export-document" /></div>
             </aside>
           </div>
           <div className="text-review-actions">
             <button type="button" onClick={() => setScreen('results')}><span aria-hidden="true">←</span>{t.reviewBack}</button>
             <div className="review-export-actions">
-              {!draftConfirmed && <button type="button" disabled={reviewDraft.trim().length < 80} onClick={confirmTextDraft}>{t.reviewNext}<span aria-hidden="true">→</span></button>}
+              {!draftConfirmed && <button type="button" disabled={!reviewReady} onClick={confirmTextDraft}>{t.reviewNext}<span aria-hidden="true">→</span></button>}
               <button type="button" disabled={!draftConfirmed} onClick={downloadResumeHtml}>{t.exportDownload}</button>
               <button type="button" disabled={!draftConfirmed} onClick={printResume}>{t.exportPrint}</button>
+              {draftConfirmed && <button type="button" className="is-secondary" onClick={startAnotherMatch}>{t.exportAnother}</button>}
             </div>
           </div>
           <p className="export-print-hint">{t.exportPrintHint}</p>
