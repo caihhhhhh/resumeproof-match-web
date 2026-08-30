@@ -189,6 +189,7 @@ a { color: inherit; text-decoration: none; }
 .admin-ga4-kpis span { color: var(--admin-quiet); font-size: 9px; }
 .admin-ga4-kpis strong { font-size: 24px; font-weight: 560; letter-spacing: -.045em; }
 .admin-ga4-kpis strong small { color: var(--admin-quiet); font-size: 11px; font-weight: 520; letter-spacing: 0; }
+.admin-ga4-kpis > div > small { color: var(--admin-quiet); font-family: var(--font-geist-mono), monospace; font-size: 8px; line-height: 1.35; }
 .admin-ga4-channel-head { display: flex; align-items: center; justify-content: space-between; padding: 17px 25px 10px; }
 .admin-ga4-channel-head span { font-size: 10px; font-weight: 620; }
 .admin-ga4-channel-head small { color: var(--admin-quiet); font-size: 8px; }

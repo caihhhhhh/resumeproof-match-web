@@ -57,6 +57,20 @@ function formatSeconds(value: number) {
   return `${minutes}m ${Math.round(value % 60)}s`;
 }
 
+function formatPeriodChange(current: number, previous: number) {
+  if (!previous) return current ? '上期为 0' : '与上期持平';
+  const change = (current - previous) / previous * 100;
+  if (Math.abs(change) < 0.05) return '与上期持平';
+  return `较上期 ${change > 0 ? '+' : ''}${change.toFixed(1)}%`;
+}
+
+function formatPointChange(current: number | null, previous: number | null) {
+  if (current === null || previous === null) return '暂无同期对比';
+  const change = current - previous;
+  if (Math.abs(change) < 0.05) return '与上期持平';
+  return `较上期 ${change > 0 ? '+' : ''}${change.toFixed(1)} 个百分点`;
+}
+
 export default function AdminDashboard({ adminName, adminEmail, signOutPath, siteOrigin, runtimeData }: AdminDashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState<AdminRangeKey>('24h');
@@ -69,6 +83,19 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
   const snapshot = runtimeData.ranges[range];
   const productSnapshot = runtimeData.productRanges[range];
   const feedbackSnapshot = runtimeData.feedbackRanges[range];
+  const ga4Range = runtimeData.ga4.ranges[range];
+  const ga4Current = ga4Range.current;
+  const ga4Previous = ga4Range.previous;
+  const ga4Kpis = [
+    { label: '活跃用户', value: ga4Current.activeUsers.toLocaleString('zh-CN'), delta: formatPeriodChange(ga4Current.activeUsers, ga4Previous.activeUsers) },
+    { label: '新用户', value: ga4Current.newUsers.toLocaleString('zh-CN'), delta: formatPeriodChange(ga4Current.newUsers, ga4Previous.newUsers) },
+    { label: '会话', value: ga4Current.sessions.toLocaleString('zh-CN'), delta: formatPeriodChange(ga4Current.sessions, ga4Previous.sessions) },
+    { label: '浏览量', value: ga4Current.views.toLocaleString('zh-CN'), delta: formatPeriodChange(ga4Current.views, ga4Previous.views) },
+    { label: '互动率', value: ga4Current.engagementRate === null ? '—' : `${ga4Current.engagementRate.toFixed(1)}%`, delta: formatPointChange(ga4Current.engagementRate, ga4Previous.engagementRate) },
+    { label: '跳出率', value: ga4Current.bounceRate === null ? '—' : `${ga4Current.bounceRate.toFixed(1)}%`, delta: formatPointChange(ga4Current.bounceRate, ga4Previous.bounceRate) },
+    { label: '平均会话时长', value: formatSeconds(ga4Current.averageSessionDuration), delta: formatPeriodChange(ga4Current.averageSessionDuration, ga4Previous.averageSessionDuration) },
+    { label: '事件 / 关键事件', value: `${ga4Current.eventCount.toLocaleString('zh-CN')} / ${ga4Current.keyEvents.toLocaleString('zh-CN')}`, delta: formatPeriodChange(ga4Current.eventCount, ga4Previous.eventCount) },
+  ];
   const productStepMax = Math.max(1, ...productSnapshot.steps.map((step) => step.count));
   const utmUrl = `${siteOrigin}/?${new URLSearchParams({
     utm_source: safeUtmValue(utmSource, 'source'),
@@ -306,38 +333,31 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
           </div>
           {runtimeData.ga4.status === 'ready' ? <>
             <div className="admin-ga4-kpis">
-              <div><span>活跃用户</span><strong>{runtimeData.ga4.ranges[range].activeUsers.toLocaleString('zh-CN')}</strong></div>
-              <div><span>新用户</span><strong>{runtimeData.ga4.ranges[range].newUsers.toLocaleString('zh-CN')}</strong></div>
-              <div><span>会话</span><strong>{runtimeData.ga4.ranges[range].sessions.toLocaleString('zh-CN')}</strong></div>
-              <div><span>浏览量</span><strong>{runtimeData.ga4.ranges[range].views.toLocaleString('zh-CN')}</strong></div>
-              <div><span>互动率</span><strong>{runtimeData.ga4.ranges[range].engagementRate === null ? '—' : `${runtimeData.ga4.ranges[range].engagementRate.toFixed(1)}%`}</strong></div>
-              <div><span>跳出率</span><strong>{runtimeData.ga4.ranges[range].bounceRate === null ? '—' : `${runtimeData.ga4.ranges[range].bounceRate.toFixed(1)}%`}</strong></div>
-              <div><span>平均会话时长</span><strong>{formatSeconds(runtimeData.ga4.ranges[range].averageSessionDuration)}</strong></div>
-              <div><span>事件 / 关键事件</span><strong>{runtimeData.ga4.ranges[range].eventCount.toLocaleString('zh-CN')} <small>/ {runtimeData.ga4.ranges[range].keyEvents.toLocaleString('zh-CN')}</small></strong></div>
+              {ga4Kpis.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.delta}</small></div>)}
             </div>
-            <div className="admin-ga4-channel-head"><span>最近 30 天渠道</span><small>Property {runtimeData.ga4.propertyId} · {formatEventTime(runtimeData.ga4.updatedAt, true)} 更新</small></div>
+            <div className="admin-ga4-channel-head"><span>{ga4Range.label}渠道</span><small>Property {runtimeData.ga4.propertyId} · {formatEventTime(runtimeData.ga4.updatedAt, true)} 更新</small></div>
             <div className="admin-ga4-channel-table">
               <table><thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>会话</th><th>用户</th><th>互动率</th><th>关键事件</th></tr></thead>
-                <tbody>{runtimeData.ga4.channels.map((item) => <tr key={item.key}><td>{item.source}</td><td>{item.medium}</td><td>{item.campaign}</td><td>{item.sessions}</td><td>{item.activeUsers}</td><td>{item.engagementRate === null ? '—' : `${item.engagementRate.toFixed(1)}%`}</td><td>{item.keyEvents}</td></tr>)}</tbody>
+                <tbody>{ga4Range.channels.map((item) => <tr key={item.key}><td>{item.source}</td><td>{item.medium}</td><td>{item.campaign}</td><td>{item.sessions}</td><td>{item.activeUsers}</td><td>{item.engagementRate === null ? '—' : `${item.engagementRate.toFixed(1)}%`}</td><td>{item.keyEvents}</td></tr>)}</tbody>
               </table>
-              {!runtimeData.ga4.channels.length && <div className="admin-empty-state">GA4 已连接，最近 30 天暂无渠道数据。</div>}
+              {!ga4Range.channels.length && <div className="admin-empty-state">GA4 已连接，{ga4Range.label}暂无渠道数据。</div>}
             </div>
             <div className="admin-ga4-detail-grid">
               <section>
-                <div className="admin-ga4-subhead"><b>热门页面</b><small>最近 30 天</small></div>
-                <div className="admin-ga4-mini-table"><table><thead><tr><th>页面</th><th>浏览</th><th>用户</th><th>互动</th></tr></thead><tbody>{runtimeData.ga4.pages.map((item) => <tr key={item.key}><td title={item.title}><b>{item.path}</b><small>{item.title}</small></td><td>{item.views}</td><td>{item.activeUsers}</td><td>{formatSeconds(item.engagementSeconds)}</td></tr>)}</tbody></table>{!runtimeData.ga4.pages.length && <div className="admin-empty-state">暂无页面数据。</div>}</div>
+                <div className="admin-ga4-subhead"><b>热门页面</b><small>{ga4Range.label}</small></div>
+                <div className="admin-ga4-mini-table"><table><thead><tr><th>页面</th><th>浏览</th><th>用户</th><th>互动</th></tr></thead><tbody>{ga4Range.pages.map((item) => <tr key={item.key}><td title={item.title}><b>{item.path}</b><small>{item.title}</small></td><td>{item.views}</td><td>{item.activeUsers}</td><td>{formatSeconds(item.engagementSeconds)}</td></tr>)}</tbody></table>{!ga4Range.pages.length && <div className="admin-empty-state">暂无页面数据。</div>}</div>
               </section>
               <section>
-                <div className="admin-ga4-subhead"><b>主要事件</b><small>最近 30 天</small></div>
-                <div className="admin-ga4-mini-table"><table><thead><tr><th>事件</th><th>次数</th><th>用户</th></tr></thead><tbody>{runtimeData.ga4.events.map((item) => <tr key={item.key}><td><b>{item.name}</b></td><td>{item.count}</td><td>{item.users}</td></tr>)}</tbody></table>{!runtimeData.ga4.events.length && <div className="admin-empty-state">暂无事件数据。</div>}</div>
+                <div className="admin-ga4-subhead"><b>主要事件</b><small>{ga4Range.label}</small></div>
+                <div className="admin-ga4-mini-table"><table><thead><tr><th>事件</th><th>次数</th><th>用户</th></tr></thead><tbody>{ga4Range.events.map((item) => <tr key={item.key}><td><b>{item.name}</b></td><td>{item.count}</td><td>{item.users}</td></tr>)}</tbody></table>{!ga4Range.events.length && <div className="admin-empty-state">暂无事件数据。</div>}</div>
               </section>
               <section>
-                <div className="admin-ga4-subhead"><b>设备</b><small>最近 30 天</small></div>
-                <div className="admin-ga4-mini-table"><table><thead><tr><th>设备</th><th>用户</th><th>会话</th><th>互动率</th></tr></thead><tbody>{runtimeData.ga4.devices.map((item) => <tr key={item.key}><td><b>{item.device}</b></td><td>{item.activeUsers}</td><td>{item.sessions}</td><td>{item.engagementRate === null ? '—' : `${item.engagementRate.toFixed(1)}%`}</td></tr>)}</tbody></table>{!runtimeData.ga4.devices.length && <div className="admin-empty-state">暂无设备数据。</div>}</div>
+                <div className="admin-ga4-subhead"><b>设备</b><small>{ga4Range.label}</small></div>
+                <div className="admin-ga4-mini-table"><table><thead><tr><th>设备</th><th>用户</th><th>会话</th><th>互动率</th></tr></thead><tbody>{ga4Range.devices.map((item) => <tr key={item.key}><td><b>{item.device}</b></td><td>{item.activeUsers}</td><td>{item.sessions}</td><td>{item.engagementRate === null ? '—' : `${item.engagementRate.toFixed(1)}%`}</td></tr>)}</tbody></table>{!ga4Range.devices.length && <div className="admin-empty-state">暂无设备数据。</div>}</div>
               </section>
               <section>
-                <div className="admin-ga4-subhead"><b>国家和地区</b><small>最近 30 天</small></div>
-                <div className="admin-ga4-mini-table"><table><thead><tr><th>地区</th><th>用户</th><th>会话</th></tr></thead><tbody>{runtimeData.ga4.countries.map((item) => <tr key={item.key}><td><b>{item.country}</b></td><td>{item.activeUsers}</td><td>{item.sessions}</td></tr>)}</tbody></table>{!runtimeData.ga4.countries.length && <div className="admin-empty-state">暂无地区数据。</div>}</div>
+                <div className="admin-ga4-subhead"><b>国家和地区</b><small>{ga4Range.label}</small></div>
+                <div className="admin-ga4-mini-table"><table><thead><tr><th>地区</th><th>用户</th><th>会话</th></tr></thead><tbody>{ga4Range.countries.map((item) => <tr key={item.key}><td><b>{item.country}</b></td><td>{item.activeUsers}</td><td>{item.sessions}</td></tr>)}</tbody></table>{!ga4Range.countries.length && <div className="admin-empty-state">暂无地区数据。</div>}</div>
               </section>
             </div>
           </> : <div className="admin-ga4-connect-state">
