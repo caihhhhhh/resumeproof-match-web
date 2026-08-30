@@ -21,12 +21,17 @@ export default async function AdminPage() {
   const isLocalPreview = process.env.NODE_ENV !== 'production';
   if (!isLocalPreview && !allowedEmails.includes(user.email.toLowerCase())) notFound();
   const runtimeData = await getAdminRuntimeData();
+  const configuredOrigin = process.env.SITE_URL?.trim();
+  const siteOrigin = configuredOrigin && /^https:\/\//i.test(configuredOrigin)
+    ? configuredOrigin.replace(/\/$/, '')
+    : 'https://resumeproof.szw19990924.chatgpt.site';
 
   return (
     <AdminDashboard
       adminName={user.displayName}
       adminEmail={user.email}
       signOutPath={chatGPTSignOutPath('/')}
+      siteOrigin={siteOrigin}
       runtimeData={runtimeData}
     />
   );
