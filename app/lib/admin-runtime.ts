@@ -13,6 +13,10 @@ export type ProductAnalyticsSnapshot = {
     suggestionAcceptanceRate: number | null;
     analysisFailures: number;
   };
+  acquisition: {
+    coverage: string;
+    channels: Array<{ key: string; label: string; visits: number; starts: number; completions: number; completionRate: number | null }>;
+  };
 };
 
 export type FeedbackSnapshot = {
@@ -242,6 +246,16 @@ function productProperties(row: ProductEventRow) {
   try { return JSON.parse(row.properties_json) as Record<string, unknown>; } catch { return {}; }
 }
 
+const acquisitionLabels: Record<string, string> = {
+  direct: '直接访问', reddit: 'Reddit', linkedin: 'LinkedIn', x: 'X', xiaohongshu: '小红书',
+  v2ex: 'V2EX', github: 'GitHub', search: '自然搜索', referral: '其他引荐',
+};
+
+function stringProperty(row: ProductEventRow, key: string) {
+  const value = productProperties(row)[key];
+  return typeof value === 'string' ? value : '';
+}
+
 function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: number): ProductAnalyticsSnapshot {
   const current = rows.filter((row) => row.occurred_at_ms >= now - windowMs);
   const count = (eventName: string, predicate?: (row: ProductEventRow) => boolean) => current
@@ -254,6 +268,27 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
   const suggestionReviews = current.filter((row) => row.event_name === 'suggestion_reviewed');
   const acceptedSuggestions = suggestionReviews.filter((row) => productProperties(row).decision === 'accepted').length;
   const analysisAttempts = analysisCompleted + analysisFailures;
+  const journeyRows = current.filter((row) => stringProperty(row, 'journey_id'));
+  const journeyIds = new Set(journeyRows.map((row) => stringProperty(row, 'journey_id')));
+  const unattributedPageViews = current.filter((row) => row.event_name === 'page_view' && !stringProperty(row, 'journey_id')).length;
+  const channelMap = new Map<string, { visits: Set<string>; starts: Set<string>; completions: Set<string> }>();
+  for (const row of journeyRows) {
+    const journeyId = stringProperty(row, 'journey_id');
+    const source = stringProperty(row, 'acquisition_source') || 'direct';
+    const channel = channelMap.get(source) ?? { visits: new Set<string>(), starts: new Set<string>(), completions: new Set<string>() };
+    if (row.event_name === 'page_view') channel.visits.add(journeyId);
+    if (row.event_name === 'analysis_started') channel.starts.add(journeyId);
+    if (row.event_name === 'analysis_completed') channel.completions.add(journeyId);
+    channelMap.set(source, channel);
+  }
+  const channels = [...channelMap.entries()].map(([key, channel]) => ({
+    key,
+    label: acquisitionLabels[key] ?? key,
+    visits: channel.visits.size,
+    starts: channel.starts.size,
+    completions: channel.completions.size,
+    completionRate: percent(channel.completions.size, channel.visits.size),
+  })).sort((a, b) => b.completions - a.completions || b.visits - a.visits).slice(0, 8);
 
   return {
     kpis: [
@@ -275,6 +310,10 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
       analysisSuccessRate: percent(analysisCompleted, analysisAttempts),
       suggestionAcceptanceRate: percent(acceptedSuggestions, suggestionReviews.length),
       analysisFailures,
+    },
+    acquisition: {
+      coverage: journeyIds.size ? `${journeyIds.size} 个新访问旅程${unattributedPageViews ? ` · ${unattributedPageViews} 次历史访问未归因` : ''}` : '新访问开始后累计',
+      channels,
     },
   };
 }

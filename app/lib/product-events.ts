@@ -15,6 +15,7 @@ const PROPERTY_KEYS = new Set([
   'resume_method', 'jd_method', 'language', 'grade', 'score_band',
   'suggestion_count', 'decision', 'adopted_suggestions', 'template', 'format',
   'helpful', 'feedback_reason',
+  'journey_id', 'acquisition_source', 'acquisition_medium', 'acquisition_campaign',
 ]);
 
 const PROPERTY_STRING_PATTERN = /^[\p{L}\p{N} ._+&/-]{1,48}$/u;
@@ -67,10 +68,14 @@ export async function recordProductEvent(input: { eventName: string; pagePath: u
   if (!db || !PRODUCT_EVENT_NAMES.has(input.eventName)) return false;
   try {
     await ensureSchema(db);
-    await db.prepare(`
-      INSERT INTO product_events (occurred_at_ms, event_name, page_path, properties_json)
-      VALUES (?, ?, ?, ?)
-    `).bind(Date.now(), input.eventName, safePath(input.pagePath), JSON.stringify(sanitizeProductProperties(input.properties))).run();
+    const now = Date.now();
+    await db.batch([
+      db.prepare(`
+        INSERT INTO product_events (occurred_at_ms, event_name, page_path, properties_json)
+        VALUES (?, ?, ?, ?)
+      `).bind(now, input.eventName, safePath(input.pagePath), JSON.stringify(sanitizeProductProperties(input.properties))),
+      db.prepare('DELETE FROM product_events WHERE occurred_at_ms < ?').bind(now - 180 * 24 * 60 * 60_000),
+    ]);
     return true;
   } catch (error) {
     console.error('Product event write failed', error instanceof Error ? error.message : 'unknown');

@@ -211,14 +211,19 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, run
             </div>
           </article>
 
-          <article className="admin-panel admin-key-events-panel">
-            <div className="admin-panel-head"><div><h2>GA4 关键事件</h2><p>用于区分“浏览过”与“真正完成价值动作”。</p></div></div>
-            <div className="admin-key-event-list">
-              <div><code>analysis_completed</code><span>获得完整匹配报告</span></div>
-              <div><code>review_draft_confirmed</code><span>确认最终文字审核稿</span></div>
-              <div><code>resume_exported</code><span>导出 HTML 或打印 PDF</span></div>
+          <article className="admin-panel admin-acquisition-panel">
+            <div className="admin-panel-head"><div><h2>推广来源</h2><p>{productSnapshot.acquisition.coverage}</p></div></div>
+            <div className="admin-acquisition-list">
+              {productSnapshot.acquisition.channels.map((channel) => (
+                <div key={channel.key}>
+                  <span><b>{channel.label}</b><small>{channel.visits} 次访问 · {channel.starts} 次发起</small></span>
+                  <span><strong>{channel.completions}</strong><small>完成分析</small></span>
+                  <span><strong>{channel.completionRate === null ? '—' : `${channel.completionRate.toFixed(0)}%`}</strong><small>访问转化</small></span>
+                </div>
+              ))}
+              {!productSnapshot.acquisition.channels.length && <div className="admin-empty-state">带来源的新访问进入后，这里会显示渠道完成率。</div>}
             </div>
-            <p>事件已经发送至 GA4；首次出现后，在 GA4 管理后台将以上三项标记为关键事件。</p>
+            <p className="admin-acquisition-note">推广链接建议使用 <code>?utm_source=reddit&amp;utm_medium=community&amp;utm_campaign=launch</code>。只保存这些渠道标签与当前标签页随机旅程编号。</p>
           </article>
         </section>
 

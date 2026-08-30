@@ -103,14 +103,14 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
   const text = language === 'zh' ? {
     label: '分析偏好',
     title: '选择分析方式',
-    body: '网站始终记录不含 Cookie 的基础访问与流程成功率；允许后，GA4 可使用分析 Cookie 识别同一次访问中的页面与步骤。两种方式都不会向 GA4 发送简历、JD、文件名或职位信息。',
+    body: '网站始终记录不含 Cookie 的基础访问、推广来源与流程成功率；当前标签页会使用随机旅程编号连接各步骤，关闭后不会继续沿用。允许后，GA4 可使用分析 Cookie。两种方式都不会向 GA4 发送简历、JD、文件名或职位信息。',
     privacy: '查看隐私政策',
     necessary: '仅基础统计',
     allow: '允许完整分析',
   } : {
     label: 'Analytics preferences',
     title: 'Choose how analytics works',
-    body: 'The site always records basic cookieless visits and workflow success rates. If allowed, GA4 may use analytics cookies to connect pages and steps within a visit. Neither mode sends resumes, JDs, filenames, or job details to GA4.',
+    body: 'The site always records basic cookieless visits, acquisition labels, and workflow success. A random journey ID connects steps only in the current tab and is not reused after it closes. If allowed, GA4 may use analytics cookies. Neither mode sends resumes, JDs, filenames, or job details to GA4.',
     privacy: 'Read the privacy policy',
     necessary: 'Basic measurement only',
     allow: 'Allow full analytics',
