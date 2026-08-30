@@ -2,6 +2,7 @@ import { readRuntimeEvents, type RuntimeEventRow, type RuntimeRequestType } from
 import { readContentSamples } from './content-samples';
 import { readProductEvents, type ProductEventRow } from './product-events';
 import { readFeedbackEvents, type FeedbackEventRow } from './feedback-events';
+import { getGa4ReportingData, type Ga4ReportingData } from './ga4-reporting';
 
 export type AdminRangeKey = '24h' | '7d' | '30d';
 
@@ -43,6 +44,7 @@ export type AdminRuntimeData = {
   ranges: Record<AdminRangeKey, AdminRuntimeSnapshot>;
   productRanges: Record<AdminRangeKey, ProductAnalyticsSnapshot>;
   feedbackRanges: Record<AdminRangeKey, FeedbackSnapshot>;
+  ga4: Ga4ReportingData;
   hasData: boolean;
   samples: Array<{
     reference: string;
@@ -367,11 +369,12 @@ function buildFeedbackSnapshot(rows: FeedbackEventRow[], now: number, windowMs: 
 
 export async function getAdminRuntimeData(): Promise<AdminRuntimeData> {
   const now = Date.now();
-  const [rows, sampleRows, productRows, feedbackRows] = await Promise.all([
+  const [rows, sampleRows, productRows, feedbackRows, ga4] = await Promise.all([
     readRuntimeEvents(now - 60 * 24 * 60 * 60_000),
     readContentSamples(),
     readProductEvents(now - 60 * 24 * 60 * 60_000),
     readFeedbackEvents(now - 60 * 24 * 60 * 60_000),
+    getGa4ReportingData(),
   ]);
   const latestSuccess = (provider: string) => rows.find((row) => row.provider === provider && row.status === 'success')?.occurred_at_ms ?? null;
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? '';
@@ -391,6 +394,7 @@ export async function getAdminRuntimeData(): Promise<AdminRuntimeData> {
       '7d': buildFeedbackSnapshot(feedbackRows, now, 7 * 24 * 60 * 60_000),
       '30d': buildFeedbackSnapshot(feedbackRows, now, 30 * 24 * 60 * 60_000),
     },
+    ga4,
     hasData: rows.length > 0 || productRows.length > 0 || feedbackRows.length > 0,
     samples: sampleRows.map((row) => ({
       reference: row.public_id,

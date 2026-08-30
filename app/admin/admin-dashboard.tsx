@@ -142,6 +142,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
           <a className="is-active" href="#overview"><span>总览</span></a>
           <a href="#performance"><span>来源与成本</span></a>
           <a href="#product-funnel"><span>产品漏斗</span></a>
+          <a href="#ga4-reporting"><span>GA4 数据</span></a>
           <a href="#requests"><span>请求记录</span></a>
           <a href="#quality"><span>模型质量</span></a>
           <a href="#samples"><span>授权样本</span></a>
@@ -289,6 +290,33 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
               <p>Source、Medium 和 Campaign 都可以自定义，并会自动转换为小写与下划线格式。</p>
             </details>
           </article>
+        </section>
+
+        <section id="ga4-reporting" className="admin-panel admin-ga4-reporting">
+          <div className="admin-panel-head">
+            <div><h2>Google Analytics 4</h2><p>访客、会话、浏览与渠道数据直接来自 GA4，不包含简历或 JD 内容。</p></div>
+            <span className={`admin-ga4-status is-${runtimeData.ga4.status}`}>{runtimeData.ga4.status === 'ready' ? '已连接' : runtimeData.ga4.status === 'error' ? '连接异常' : '待连接'}</span>
+          </div>
+          {runtimeData.ga4.status === 'ready' ? <>
+            <div className="admin-ga4-kpis">
+              <div><span>活跃用户</span><strong>{runtimeData.ga4.ranges[range].activeUsers.toLocaleString('zh-CN')}</strong></div>
+              <div><span>会话</span><strong>{runtimeData.ga4.ranges[range].sessions.toLocaleString('zh-CN')}</strong></div>
+              <div><span>浏览量</span><strong>{runtimeData.ga4.ranges[range].views.toLocaleString('zh-CN')}</strong></div>
+              <div><span>互动率</span><strong>{runtimeData.ga4.ranges[range].engagementRate === null ? '—' : `${runtimeData.ga4.ranges[range].engagementRate.toFixed(1)}%`}</strong></div>
+            </div>
+            <div className="admin-ga4-channel-head"><span>最近 30 天渠道</span><small>Property {runtimeData.ga4.propertyId} · {formatEventTime(runtimeData.ga4.updatedAt, true)} 更新</small></div>
+            <div className="admin-ga4-channel-table">
+              <table><thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>会话</th><th>用户</th><th>互动率</th></tr></thead>
+                <tbody>{runtimeData.ga4.channels.map((item) => <tr key={item.key}><td>{item.source}</td><td>{item.medium}</td><td>{item.campaign}</td><td>{item.sessions}</td><td>{item.activeUsers}</td><td>{item.engagementRate === null ? '—' : `${item.engagementRate.toFixed(1)}%`}</td></tr>)}</tbody>
+              </table>
+              {!runtimeData.ga4.channels.length && <div className="admin-empty-state">GA4 已连接，最近 30 天暂无渠道数据。</div>}
+            </div>
+          </> : <div className="admin-ga4-connect-state">
+            <div><span>01</span><b>填写数字 Property ID</b></div>
+            <div><span>02</span><b>启用 Analytics Data API</b></div>
+            <div><span>03</span><b>授予服务账号查看权限</b></div>
+            <p>{runtimeData.ga4.message}</p>
+          </div>}
         </section>
 
         <section className="admin-grid-row" id="quality">
