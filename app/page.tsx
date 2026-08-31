@@ -14,7 +14,7 @@ const copy = {
     titleTwo: '再证明为什么。',
     intro: '不是给简历打一个模糊分数，而是逐条核对岗位要求、真实经历和简历表达，再决定值不值得申请。',
     primary: '开始一次匹配',
-    secondary: '查看完整示例',
+    secondary: '体验完整示例',
     example: '示例结果',
     lab: 'Alignment Lab',
     ready: '示例校准完成',
@@ -48,7 +48,7 @@ const copy = {
     titleTwo: 'Then prove why.',
     intro: 'Not another vague resume score. Verify every requirement against real experience and resume evidence before deciding whether to apply.',
     primary: 'Start a match',
-    secondary: 'View a full example',
+    secondary: 'Try the full example',
     example: 'Example result',
     lab: 'Alignment Lab',
     ready: 'Example calibrated',
@@ -106,7 +106,7 @@ export default function Home() {
           <p className="hero-copy">{t.intro}</p>
           <div className="hero-actions">
             <Link className="primary-link" href="/match/new" onClick={() => trackEvent('match_started', { source: 'homepage' })}>{t.primary}<span aria-hidden="true">→</span></Link>
-            <a className="text-link" href="#example">{t.secondary}<span aria-hidden="true">↘</span></a>
+            <Link className="text-link" href="/match/new?demo=1" onClick={() => trackEvent('demo_entry_clicked', { source: 'homepage' })}>{t.secondary}<span aria-hidden="true">↗</span></Link>
           </div>
         </div>
 

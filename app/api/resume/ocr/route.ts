@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   const apiKey = process.env.ZHIPU_API_KEY?.trim();
   if (!apiKey) return done(privateJson({ error: 'OCR_NOT_CONFIGURED' }, { status: 503 }));
 
-  let body: { images?: unknown; filename?: unknown; language?: unknown };
+  let body: { images?: unknown; filename?: unknown; language?: unknown; documentType?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -66,6 +66,7 @@ export async function POST(request: Request) {
   }
 
   const outputLanguage = body.language === 'en' ? 'English' : 'Chinese or the source language';
+  const documentType = body.documentType === 'jd' ? 'job description' : 'resume';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 65_000);
 
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
       model,
       stream: false,
       thinking: { type: 'disabled' },
-      max_tokens: 12_000,
+      max_tokens: 7_000,
       temperature: 0.1,
       messages: [
         {
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
             ...images.map((url) => ({ type: 'image_url', image_url: { url } })),
             {
               type: 'text',
-              text: `Transcribe this resume exactly and return only editable plain text. The pages are in order. Preserve headings, paragraph order, bullet points, dates, company names, job titles, metrics, URLs, and the original language. Use • for bullet points, but do not add Markdown heading markers, code fences, tables, commentary, or explanations. Do not summarize, rewrite, translate, correct, infer, or add anything. Mark unreadable text as [无法识别]. The interface language is ${outputLanguage}.`,
+              text: `Transcribe this ${documentType} exactly and return only editable plain text. The pages are in order. Preserve headings, paragraph order, bullet points, dates, company names, job titles, requirements, metrics, URLs, and the original language. Use • for bullet points, but do not add Markdown heading markers, code fences, tables, commentary, or explanations. Do not summarize, rewrite, translate, correct, infer, or add anything. Mark unreadable text as [无法识别]. The interface language is ${outputLanguage}.`,
             },
           ],
         },

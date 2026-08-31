@@ -4,10 +4,12 @@ import { productEventsNameIndex, productEventsSchema, productEventsTimeIndex } f
 export const PRODUCT_EVENT_NAMES = new Set([
   'page_view', 'match_started',
   'resume_upload_started', 'resume_upload_completed', 'resume_upload_failed', 'resume_input_ready',
-  'jd_link_parse_started', 'jd_link_parse_completed', 'jd_link_parse_failed', 'jd_input_ready',
+  'jd_link_parse_started', 'jd_link_parse_completed', 'jd_link_parse_failed',
+  'jd_file_upload_started', 'jd_file_upload_completed', 'jd_file_upload_failed', 'jd_input_ready',
   'analysis_started', 'analysis_completed', 'analysis_failed',
   'result_feedback_submitted',
-  'suggestion_reviewed', 'review_draft_built', 'review_draft_confirmed', 'resume_exported',
+  'suggestion_reviewed', 'review_draft_built', 'review_draft_confirmed',
+  'demo_entry_clicked', 'demo_started', 'export_ready_viewed', 'resume_export_started', 'resume_exported',
 ]);
 
 const PROPERTY_KEYS = new Set([

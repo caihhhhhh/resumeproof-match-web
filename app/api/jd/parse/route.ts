@@ -486,38 +486,33 @@ export async function POST(request: Request) {
     }
   }
 
-  for (const candidate of directCandidates(url, source)) {
-    telemetryProvider = 'local';
-    telemetryMethod = 'structured_data';
+  const attemptCodes: string[] = [];
+  const attempts: Array<Promise<{
+    provider: 'local' | 'zhipu'; method: string; canonicalUrl: string;
+    title: string; company: string; location: string; jdText: string;
+  }>> = directCandidates(url, source).map(async (candidate) => {
     try {
       const { html, finalUrl } = await fetchPublicPage(candidate);
       const posting = extractStructuredPosting(html);
-      if (!posting) {
-        lastCode = 'NO_JOB_POSTING_DATA';
-        continue;
-      }
+      if (!posting) throw new Error('NO_JOB_POSTING_DATA');
 
       const description = decodeHtml(stringValue(posting.description)).slice(0, MAX_JD_LENGTH);
-      if (description.length < 80) {
-        lastCode = 'INCOMPLETE_JOB_POSTING';
-        continue;
-      }
-
-      return done(response({
-        status: 'success',
-        source,
-        sourceLabel: sourceLabels[source],
+      if (description.length < 80) throw new Error('INCOMPLETE_JOB_POSTING');
+      return {
+        provider: 'local' as const,
+        method: 'structured_data',
         canonicalUrl: finalUrl,
         title: stringValue(posting.title),
         company: organizationName(posting.hiringOrganization),
         location: locationName(posting.jobLocation),
         jdText: description,
-        extractionMethod: 'structured_data',
-      }));
+      };
     } catch (error) {
-      lastCode = stableErrorCode(error, 'FETCH_FAILED');
+      const code = stableErrorCode(error, 'FETCH_FAILED');
+      attemptCodes.push(code);
+      throw error;
     }
-  }
+  });
 
   const zhipuKey = process.env.ZHIPU_API_KEY?.trim();
   const readers: Array<{ method: string; fetch: () => Promise<ReaderResult> }> = [];
@@ -529,31 +524,51 @@ export async function POST(request: Request) {
     readers.push({ method: 'zhipu_reader', fetch: () => fetchZhipuReaderPage(url, zhipuKey) });
   }
 
-  let readerCode = lastCode;
   for (const readerSource of readers) {
-    telemetryProvider = readerSource.method === 'zhipu_reader' ? 'zhipu' : 'local';
-    telemetryMethod = readerSource.method;
-    try {
-      const reader = await readerSource.fetch();
-      const jdText = extractLikelyJobText(reader.content || reader.description, source);
-      if (!looksLikeJobDescription(jdText)) throw new Error('READER_NO_JOB_CONTENT');
-      const metadata = readerMetadata(reader.title, source);
-      return done(response({
-        status: 'success',
-        source,
-        sourceLabel: sourceLabels[source],
-        canonicalUrl: url.toString(),
-        title: metadata.title,
-        company: metadata.company,
-        location: metadata.location,
-        jdText,
-        extractionMethod: readerSource.method,
-      }));
-    } catch (error) {
-      readerCode = stableErrorCode(error, 'READER_FAILED');
-    }
+    attempts.push((async () => {
+      try {
+        const reader = await readerSource.fetch();
+        const jdText = extractLikelyJobText(reader.content || reader.description, source);
+        if (!looksLikeJobDescription(jdText)) throw new Error('READER_NO_JOB_CONTENT');
+        const metadata = readerMetadata(reader.title, source);
+        return {
+          provider: readerSource.method === 'zhipu_reader' ? 'zhipu' as const : 'local' as const,
+          method: readerSource.method,
+          canonicalUrl: url.toString(),
+          title: metadata.title,
+          company: metadata.company,
+          location: metadata.location,
+          jdText,
+        };
+      } catch (error) {
+        attemptCodes.push(stableErrorCode(error, 'READER_FAILED'));
+        throw error;
+      }
+    })());
   }
 
+  try {
+    const winner = await Promise.any(attempts);
+    telemetryProvider = winner.provider;
+    telemetryMethod = winner.method;
+    return done(response({
+      status: 'success',
+      source,
+      sourceLabel: sourceLabels[source],
+      canonicalUrl: winner.canonicalUrl,
+      title: winner.title,
+      company: winner.company,
+      location: winner.location,
+      jdText: winner.jdText,
+      extractionMethod: winner.method,
+    }));
+  } catch {
+    // Every safe extraction path failed; fall back to user-supplied text or file.
+  }
+
+  const readerCode = attemptCodes.find((code) => code === 'READER_NO_JOB_CONTENT')
+    ?? attemptCodes.at(-1)
+    ?? lastCode;
   return done(response({
     status: 'paste_required',
     source,

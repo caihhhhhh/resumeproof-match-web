@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { OptimizationReview, SuggestionDecision } from '../../components/optimization-review';
 import { ResumeDocument, ResumeTemplate, ReviewBlock, splitResumeEntry } from '../../components/resume-document';
 import { ResumeStructuredEditor } from '../../components/resume-structured-editor';
 import { SiteFooter } from '../../components/site-footer';
 import { useLanguage } from '../../components/language-context';
+import { getDemoMaterials } from '../../lib/demo-materials';
 import { EvidenceStatus, isMatchAnalysis, MatchAnalysis } from '../../lib/match-analysis';
 import { identifyJobSource, sourceLabels } from '../../lib/job-source';
 import { fileSizeBucket, trackEvent } from '../../lib/analytics';
@@ -21,6 +22,7 @@ const ACCEPTED_RESUME_EXTENSIONS = new Set([
 ]);
 
 const RESUME_FILE_ACCEPT = '.pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg,image/webp';
+const JD_FILE_ACCEPT = RESUME_FILE_ACCEPT;
 
 type StoredDraft = {
   screen: Screen;
@@ -54,7 +56,8 @@ const copy = {
     pendingOcr: '文件已上传，但没有识别到足够文字。请重新上传或粘贴文字。', replace: '重新选择', unsupported: '暂不支持此格式，请上传 PDF、DOCX、TXT、MD、PNG、JPG 或 WebP。', tooLarge: '文件超过 8 MB。',
     ocrNotConfigured: '视觉识别服务尚未配置，请联系网站管理员。', ocrAuth: '视觉识别服务授权异常，请联系网站管理员。', ocrRate: '视觉识别请求过于频繁，请稍后重试。', ocrTimeout: '视觉识别超时，请重新上传。', ocrPageLimit: '扫描 PDF 最多支持 6 页，请上传精简版简历。', ocrFailed: '没有可靠识别出简历文字，请重新上传清晰文件或粘贴文字。',
     resumePlaceholder: '粘贴完整简历内容……', reviewResume: '查看或编辑读取到的简历文字', restoredResume: '已恢复当前标签页中的简历文字',
-    jdTitle: '目标岗位', jdBody: '同一个输入框可接收职位链接或完整 JD。', jdPlaceholder: '粘贴职位链接，或直接粘贴职责与任职要求……',
+    jdTitle: '目标岗位', jdBody: '粘贴文字或链接，也可以上传 JD 文件与截图。', jdPlaceholder: '粘贴职位链接，或直接粘贴职责与任职要求……',
+    jdUpload: '上传 JD 文件或截图', jdUploadHint: 'PDF、DOCX、TXT、MD、PNG、JPG 或 WebP', jdUploaded: 'JD 内容已读取，请核对文字。', jdReading: '正在读取 JD…',
     parseLink: '读取职位链接', parsingLink: '正在读取…', detected: '已识别来源', linkParsed: '职位内容已读取，请检查原文。', pasteRequired: '该页面无法可靠自动读取，请把完整 JD 粘贴到输入框。', detailLinkRequired: '请粘贴具体职位详情页链接，而不是搜索结果或职位列表页。',
     invalidUrl: '请输入有效的 HTTPS 招聘链接。', reviewJd: '查看或编辑读取到的 JD 文字', characters: '字符', start: '开始 AI 分析', confirmAndAnalyze: '确认识别文字并分析', analyzing: 'AI 正在分析…', startHint: '点击后，已核对的简历与 JD 文字将发送给 DeepSeek 做语义分析；图片或扫描 PDF 仅在识别时发送给智谱。', sampleConsent: '允许保存自动脱敏后的简历与 JD 30 天，用于改进匹配质量（可选）', samplePrivacy: '了解数据处理', sampleSaved: '脱敏样本已保存 30 天', sampleDelete: '立即删除', sampleDeleted: '样本已删除',
     aiNotConfigured: '分析服务尚未配置，请联系网站管理员。', aiFailed: '分析服务暂时不可用，请稍后重试。', aiAuth: '分析服务授权异常，请联系网站管理员。', aiBalance: '分析服务额度不足，请联系网站管理员。', aiRate: '分析服务请求过于频繁，请稍后重试。', siteRate: '当前设备请求较频繁，请稍后再试。', aiOutput: '完整报告未生成成功，请重新分析。系统不会展示缺少评分、证据或建议的半成品。', aiTimeout: '分析超过 60 秒仍未响应，请重新分析。',
@@ -64,10 +67,11 @@ const copy = {
     statusStrong: '已证实', statusPartial: '部分证据', statusGap: '尚无证据', noMatchedTerms: '暂无可核对原句', coveredTitle: '已有优势', missingTitle: '优先补证',
     missingAdvice: '只补充真实做过的项目、动作或结果；没有经历就保留为差距。', metricSignals: '份量化结果已识别', localRules: 'AI 语义诊断 · 原句证据校验', evidenceQuote: '简历证据', whyMatch: '判断依据',
     feedbackTitle: '这份分析对你有帮助吗？', feedbackBody: '只记录选择，不记录简历或 JD 内容。', feedbackYes: '有帮助', feedbackNo: '不太准', feedbackWhy: '主要问题是', feedbackThanks: '收到，感谢你的反馈。', feedbackError: '暂时无法提交，请稍后再试。', feedbackScore: '评分不合理', feedbackEvidence: '漏掉已有经历', feedbackSuggestions: '建议不实用', feedbackUnclear: '解释不清楚', feedbackOther: '其他',
-    reviewEyebrow: '完整文字审核稿', reviewTitle: '读顺全文，选好版式再导出。', reviewBody: '这里只合并你明确采用的建议。你可以继续编辑全文和切换版式；确认前不会创建任何文件。', reviewChanges: '本轮已采用修改', reviewOriginal: '原文', reviewFinal: '审核稿', reviewCharacters: '字符', reviewWarning: '请重点核对公司、职位、日期、数字和专有名词。确认文字稿后，本页会立即开放 HTML 与 PDF 导出。', reviewBack: '返回建议审核', reviewNext: '确认并锁定文字稿', reviewPreview: '排版预览', reviewEdit: '编辑文字', reviewPreviewHint: '预览只调整视觉层级与空白，不改变审核稿内容。', reviewNoChanges: '本轮没有采用 AI 改写，当前显示原始简历全文。', reviewCanvas: '文字排版预览', reviewPage: '页', reviewPagesApprox: '预计', reviewIncomplete: '项待填写', reviewLong: '内容可能超过两页，建议切换紧凑版或精简次要信息。',
+    reviewEyebrow: '完整文字审核稿', reviewTitle: '审核、选版式、导出，一页完成。', reviewBody: '这里只合并你明确采用的建议。核对全文并选择版式后，可直接确认并保存 PDF 或 DOCX。', reviewChanges: '本轮已采用修改', reviewOriginal: '原文', reviewFinal: '审核稿', reviewCharacters: '字符', reviewWarning: '导出前请重点核对公司、职位、日期、数字和专有名词。', reviewBack: '返回建议审核', reviewNext: '确认文字稿', reviewPreview: '排版预览', reviewEdit: '编辑文字', reviewPreviewHint: '预览只调整视觉层级与空白，不改变审核稿内容。', reviewNoChanges: '本轮没有采用 AI 改写，当前显示原始简历全文。', reviewCanvas: '文字排版预览', reviewPage: '页', reviewPagesApprox: '预计', reviewIncomplete: '项待填写', reviewLong: '内容可能超过两页，建议切换紧凑版或精简次要信息。',
     confirmedEyebrow: '文字审核已完成', confirmedTitle: '这份文字稿已锁定。', confirmedBody: '系统保存了当前全文快照。返回修改任何文字后，本次确认会自动失效；此操作不会生成 HTML、PDF 或其他文件。', confirmedSnapshot: '已确认全文', confirmedChanges: '采用修改', confirmedTime: '确认时间', confirmedEdit: '返回继续编辑', confirmedNext: '选择简历模板', confirmedNextHint: '先选择版式，不会立即生成文件。',
     templateEyebrow: '选择版式', templateTitle: '内容不变，只调整阅读节奏。', templateBody: '三个模板共用已确认文字。切换模板不会重写内容，也不会影响匹配报告。', templateBalanced: '均衡单栏', templateBalancedBody: '清晰分区与舒适行距，适合大多数岗位。', templateCompact: '紧凑单栏', templateCompactBody: '缩小段间距，适合经历较多或希望控制页数的简历。', templateMinimal: '极简单栏', templateMinimalBody: '弱化颜色和边框，让公司、岗位与成果成为重点。', templateSelected: '已选择', templateBack: '返回确认记录', templateContinue: '进入最终预览',
-    exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。HTML 可继续编辑；打印时在系统窗口选择“另存为 PDF”。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '打印 / 保存 PDF', exportAnother: '用当前简历匹配新岗位', exportPrintHint: '打印建议：A4、默认边距、背景图形开启。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成',
+    exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '确认并保存 PDF', exportDocx: '确认并下载 DOCX', exportMore: '更多格式', exportAnother: '用当前简历匹配新岗位', exportPrintHint: 'PDF 会打开系统打印窗口，请选择“另存为 PDF”；DOCX 可继续在 Word 中编辑。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成',
+    demoAction: '使用示例材料完整体验', demoLoaded: '示例材料与完整报告已载入',
   },
   en: {
     back: 'Back home', workspaceTitle: 'Put both sources in one place.', workspaceBody: 'Files are read in your browser and kept only for this tab. Resume and JD text is sent to the AI service after you start analysis; scanned files use visual recognition.',
@@ -77,7 +81,8 @@ const copy = {
     pendingOcr: 'The file uploaded, but not enough text was recognized. Upload it again or paste the text.', replace: 'Choose another', unsupported: 'Upload a PDF, DOCX, TXT, MD, PNG, JPG, or WebP file.', tooLarge: 'The file is larger than 8 MB.',
     ocrNotConfigured: 'Visual recognition is not configured. Contact the site administrator.', ocrAuth: 'Visual recognition has an authorization issue. Contact the site administrator.', ocrRate: 'Visual recognition is rate-limited. Try again shortly.', ocrTimeout: 'Visual recognition timed out. Upload the file again.', ocrPageLimit: 'Scanned PDFs can contain up to 6 pages. Upload a shorter resume.', ocrFailed: 'The resume text could not be read reliably. Upload a clearer file or paste the text.',
     resumePlaceholder: 'Paste the complete resume here…', reviewResume: 'Review or edit the extracted resume text', restoredResume: 'Restored text from this browser tab',
-    jdTitle: 'Target role', jdBody: 'The same field accepts a job link or the complete JD.', jdPlaceholder: 'Paste a job link or the complete responsibilities and requirements…',
+    jdTitle: 'Target role', jdBody: 'Paste text or a link, or upload a JD file or screenshot.', jdPlaceholder: 'Paste a job link or the complete responsibilities and requirements…',
+    jdUpload: 'Upload a JD file or screenshot', jdUploadHint: 'PDF, DOCX, TXT, MD, PNG, JPG, or WebP', jdUploaded: 'JD content extracted. Review the text.', jdReading: 'Reading the JD…',
     parseLink: 'Read job link', parsingLink: 'Reading…', detected: 'Detected source', linkParsed: 'Job content extracted. Review the source text.', pasteRequired: 'This page cannot be read reliably. Paste the complete JD into the field.', detailLinkRequired: 'Paste a specific job-detail URL rather than a search or job-listing page.',
     invalidUrl: 'Enter a valid HTTPS job posting URL.', reviewJd: 'Review or edit the extracted JD text', characters: 'characters', start: 'Start AI analysis', confirmAndAnalyze: 'Confirm extracted text and analyze', analyzing: 'AI is analyzing…', startHint: 'After you click, reviewed resume and JD text is sent to DeepSeek for semantic analysis. Images or scanned PDFs are sent to Zhipu only for recognition.', sampleConsent: 'Save an automatically redacted resume and JD for 30 days to improve matching (optional)', samplePrivacy: 'How data is handled', sampleSaved: 'Redacted sample saved for 30 days', sampleDelete: 'Delete now', sampleDeleted: 'Sample deleted',
     aiNotConfigured: 'The analysis service is not configured. Contact the site administrator.', aiFailed: 'The analysis service is temporarily unavailable. Please try again.', aiAuth: 'The analysis service has an authorization issue. Contact the site administrator.', aiBalance: 'The analysis service has insufficient quota. Contact the site administrator.', aiRate: 'The analysis service is rate-limiting requests. Try again shortly.', siteRate: 'This device has made too many requests. Please try again shortly.', aiOutput: 'The complete report could not be generated. Please retry; incomplete scores, evidence, or suggestions will never be shown.', aiTimeout: 'Analysis did not finish within 60 seconds. Please run it again.',
@@ -87,10 +92,11 @@ const copy = {
     statusStrong: 'Supported', statusPartial: 'Partial evidence', statusGap: 'No evidence yet', noMatchedTerms: 'No verified excerpt yet', coveredTitle: 'Current strengths', missingTitle: 'Evidence to add first',
     missingAdvice: 'Add only projects, actions, or outcomes you actually have. If the experience does not exist, keep it as a gap.', metricSignals: 'quantified results detected', localRules: 'AI semantic diagnostic · source evidence verified', evidenceQuote: 'Resume evidence', whyMatch: 'Reasoning',
     feedbackTitle: 'Was this analysis useful?', feedbackBody: 'Only your selection is stored. Resume and JD content are not included.', feedbackYes: 'Useful', feedbackNo: 'Not accurate', feedbackWhy: 'Main issue', feedbackThanks: 'Thanks, your feedback was received.', feedbackError: 'Feedback could not be submitted. Try again later.', feedbackScore: 'Score feels wrong', feedbackEvidence: 'Missed existing evidence', feedbackSuggestions: 'Suggestions are weak', feedbackUnclear: 'Explanation is unclear', feedbackOther: 'Other',
-    reviewEyebrow: 'Full text review', reviewTitle: 'Read it through, choose a layout, then export.', reviewBody: 'Only suggestions you explicitly adopted are merged here. Keep editing or switch layouts; no file is created before confirmation.', reviewChanges: 'Adopted changes', reviewOriginal: 'Original', reviewFinal: 'Review draft', reviewCharacters: 'characters', reviewWarning: 'Verify company names, titles, dates, metrics, and proper nouns. Confirming the text unlocks HTML and PDF export on this page.', reviewBack: 'Back to suggestions', reviewNext: 'Confirm and lock text', reviewPreview: 'Layout preview', reviewEdit: 'Edit text', reviewPreviewHint: 'The preview changes hierarchy and spacing only. Draft content stays unchanged.', reviewNoChanges: 'No AI rewrite was adopted. The original resume is shown in full.', reviewCanvas: 'Text layout preview', reviewPage: 'page', reviewPagesApprox: 'About', reviewIncomplete: 'fields to complete', reviewLong: 'This may run beyond two pages. Try the compact layout or trim lower-priority details.',
+    reviewEyebrow: 'Full text review', reviewTitle: 'Review, choose a layout, and export on one page.', reviewBody: 'Only suggestions you explicitly adopted are merged here. Verify the full draft, choose a layout, then confirm and save PDF or DOCX.', reviewChanges: 'Adopted changes', reviewOriginal: 'Original', reviewFinal: 'Review draft', reviewCharacters: 'characters', reviewWarning: 'Before export, verify company names, titles, dates, metrics, and proper nouns.', reviewBack: 'Back to suggestions', reviewNext: 'Confirm draft', reviewPreview: 'Layout preview', reviewEdit: 'Edit text', reviewPreviewHint: 'The preview changes hierarchy and spacing only. Draft content stays unchanged.', reviewNoChanges: 'No AI rewrite was adopted. The original resume is shown in full.', reviewCanvas: 'Text layout preview', reviewPage: 'page', reviewPagesApprox: 'About', reviewIncomplete: 'fields to complete', reviewLong: 'This may run beyond two pages. Try the compact layout or trim lower-priority details.',
     confirmedEyebrow: 'Text review complete', confirmedTitle: 'This draft is now locked.', confirmedBody: 'The complete text snapshot has been saved. Editing any text will invalidate this confirmation. No HTML, PDF, or other file is created here.', confirmedSnapshot: 'Confirmed text', confirmedChanges: 'adopted changes', confirmedTime: 'Confirmed at', confirmedEdit: 'Return to edit', confirmedNext: 'Choose a template', confirmedNextHint: 'Choose the layout first. No file is generated yet.',
     templateEyebrow: 'Choose a layout', templateTitle: 'Keep the content. Change the reading rhythm.', templateBody: 'All three templates use the confirmed text. Switching layouts does not rewrite the resume or change the match report.', templateBalanced: 'Balanced single column', templateBalancedBody: 'Clear sections and comfortable spacing for most roles.', templateCompact: 'Compact single column', templateCompactBody: 'Tighter spacing for longer resumes or stricter page limits.', templateMinimal: 'Minimal single column', templateMinimalBody: 'Less color and fewer rules, with focus on roles and outcomes.', templateSelected: 'Selected', templateBack: 'Back to confirmation', templateContinue: 'Open final preview',
-    exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout. The HTML remains editable; use the system print dialog to save a PDF.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Print / save PDF', exportAnother: 'Match this resume to another job', exportPrintHint: 'Recommended print settings: A4, default margins, background graphics on.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready',
+    exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Confirm and save PDF', exportDocx: 'Confirm and download DOCX', exportMore: 'More formats', exportAnother: 'Match this resume to another job', exportPrintHint: 'PDF opens the system print dialog; choose Save as PDF. DOCX remains editable in Word.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready',
+    demoAction: 'Try the complete example', demoLoaded: 'Example materials and full report loaded',
   },
 } as const;
 
@@ -226,6 +232,36 @@ p { margin: 0 0 7px; font-size: 10.8px; line-height: 1.62; }
 </html>`;
 }
 
+async function resumeDocxBlob(blocks: ReviewBlock[], language: 'zh' | 'en') {
+  const {
+    AlignmentType, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun,
+  } = await import('docx');
+  const font = language === 'zh' ? 'Microsoft YaHei' : 'Arial';
+  const children = blocks.flatMap((block) => {
+    const text = block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '').trim();
+    if (!text) return [];
+    if (block.kind === 'name') return [new Paragraph({ heading: HeadingLevel.TITLE, spacing: { after: 80 }, children: [new TextRun({ text, bold: true, font, size: 34 })] })];
+    if (block.kind === 'headline') return [new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text, bold: true, font, size: 21, color: '303846' })] })];
+    if (block.kind === 'contact') return [new Paragraph({ spacing: { after: 140 }, children: [new TextRun({ text, font, size: 18, color: '596272' })] })];
+    if (block.kind === 'section') return [new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { before: 220, after: 90 }, border: { bottom: { color: '4F65FF', size: 7, style: 'single' } }, children: [new TextRun({ text: text.replace(/[:：]$/, ''), bold: true, font, size: 22, color: '344ACF' })] })];
+    if (block.kind === 'entry') {
+      const entry = splitResumeEntry(block.text);
+      return [new Paragraph({
+        spacing: { before: 100, after: 55 },
+        tabStops: [{ type: TabStopType.RIGHT, position: 9_000 }],
+        children: [new TextRun({ text: entry.title, bold: true, font, size: 20 }), ...(entry.date ? [new TextRun({ text: `\t${entry.date}`, bold: true, font, size: 18, color: '596272' })] : [])],
+      })];
+    }
+    if (block.kind === 'bullet') return [new Paragraph({ bullet: { level: 0 }, spacing: { after: 45, line: 300 }, children: [new TextRun({ text, font, size: 19 })] })];
+    return [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 65, line: 300 }, children: [new TextRun({ text, font, size: 19 })] })];
+  });
+  const document = new Document({
+    styles: { default: { document: { run: { font, size: 19 }, paragraph: { spacing: { line: 300 } } } } },
+    sections: [{ properties: { page: { margin: { top: 720, right: 850, bottom: 720, left: 850 } } }, children }],
+  });
+  return Packer.toBlob(document);
+}
+
 async function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -235,7 +271,7 @@ async function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promis
   }
 }
 
-async function readResumeFile(file: File): Promise<string> {
+async function readDocumentFile(file: File): Promise<string> {
   const extension = fileExtension(file.name);
   if (extension === 'pdf') {
     const { extractText } = await import('unpdf');
@@ -293,13 +329,13 @@ async function prepareOcrImages(file: File): Promise<string[]> {
   return pages;
 }
 
-async function recognizeResumeFile(file: File, language: 'zh' | 'en'): Promise<string> {
+async function recognizeDocumentFile(file: File, language: 'zh' | 'en', documentType: 'resume' | 'jd'): Promise<string> {
   const images = await withTimeout(prepareOcrImages(file), 30_000);
   if (!images.length) return '';
   const response = await fetch('/api/resume/ocr', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ images, filename: file.name, language }),
+    body: JSON.stringify({ images, filename: file.name, language, documentType }),
     signal: AbortSignal.timeout(75_000),
   });
   const data = await response.json().catch(() => ({})) as { text?: string; error?: string };
@@ -320,6 +356,8 @@ export default function NewMatchPage() {
   const [resumeState, setResumeState] = useState<ParseState>('idle');
   const [resumeError, setResumeError] = useState('');
   const [jdEntry, setJdEntry] = useState('');
+  const [jdFile, setJdFile] = useState<File | null>(null);
+  const [jdFileName, setJdFileName] = useState('');
   const [jdText, setJdText] = useState('');
   const [jdSource, setJdSource] = useState('');
   const [jdState, setJdState] = useState<ParseState>('idle');
@@ -350,6 +388,8 @@ export default function NewMatchPage() {
   const reviewRedoRef = useRef<ReviewBlock[][]>([]);
   const reviewMergeAtRef = useRef(0);
   const previewMeasureRef = useRef<HTMLDivElement>(null);
+  const demoAutoLoadedRef = useRef(false);
+  const exportReadyTrackedRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -431,6 +471,26 @@ export default function NewMatchPage() {
     return () => window.clearInterval(timer);
   }, [analysisState]);
 
+  const activateDemo = useCallback(() => {
+    const demo = getDemoMaterials(language);
+    setResumeMode('paste'); setResumeFile(null); setResumeName(''); setResumeText(demo.resume); setResumeNeedsReview(false); setResumeState('ready'); setResumeError('');
+    setJdFile(null); setJdFileName(''); setJdEntry(demo.jd); setJdText(demo.jd); setJdSource(language === 'zh' ? '公开脱敏示例' : 'Public demo'); setJdState('ready'); setJdMessage('');
+    setJobTitle(language === 'zh' ? '增长营销经理' : 'Growth Marketing Manager'); setJobCompany('Example Labs'); setJobLocation('');
+    setAnalysis(demo.analysis); setAnalysisState('idle'); setAnalysisError(''); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt(''); setSampleReference(''); setSampleDeleted(false); setFeedbackIntent('idle'); setFeedbackState('idle');
+    resumeReadyTracked.current = true; jdReadyTracked.current = true; reviewUndoRef.current = []; reviewRedoRef.current = [];
+    setScreen('results');
+    trackEvent('demo_started', { language });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [language]);
+
+  useEffect(() => {
+    if (!draftRestored || demoAutoLoadedRef.current) return;
+    if (new URLSearchParams(window.location.search).get('demo') !== '1') return;
+    demoAutoLoadedRef.current = true;
+    const timer = window.setTimeout(activateDemo, 0);
+    return () => window.clearTimeout(timer);
+  }, [activateDemo, draftRestored]);
+
   async function handleResumeFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -444,9 +504,9 @@ export default function NewMatchPage() {
     setResumeFile(file); setResumeName(file.name); setResumeText(''); setResumeState('working'); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt(''); resumeReadyTracked.current = false;
     trackEvent('resume_upload_started', { file_type: fileExtension(file.name), file_size: fileSizeBucket(file.size) });
     try {
-      const localText = await readResumeFile(file).catch(() => '');
+      const localText = await readDocumentFile(file).catch(() => '');
       const usedOcr = localText.length < 80;
-      const text = usedOcr ? await recognizeResumeFile(file, language) : localText;
+      const text = usedOcr ? await recognizeDocumentFile(file, language, 'resume') : localText;
       setResumeText(text.length >= 80 ? text : '');
       setResumeNeedsReview(usedOcr && text.length >= 80);
       if (text.length >= 80) {
@@ -475,8 +535,43 @@ export default function NewMatchPage() {
     }
   }
 
+  async function handleJdFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const extension = fileExtension(file.name);
+    if (!ACCEPTED_RESUME_EXTENSIONS.has(extension)) {
+      setJdFile(null); setJdFileName(''); setJdState('error'); setJdMessage(t.unsupported); event.target.value = ''; return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setJdFile(null); setJdFileName(''); setJdState('error'); setJdMessage(t.tooLarge); event.target.value = ''; return;
+    }
+    setJdFile(file); setJdFileName(file.name); setJdEntry(''); setJdText(''); setJdState('working'); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation(''); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt(''); jdReadyTracked.current = false;
+    trackEvent('jd_file_upload_started', { file_type: extension, file_size: fileSizeBucket(file.size) });
+    try {
+      const localText = await readDocumentFile(file).catch(() => '');
+      const usedOcr = localText.length < 80;
+      const text = usedOcr ? await recognizeDocumentFile(file, language, 'jd') : localText;
+      if (text.length < 80) throw new Error('OCR_FAILED');
+      setJdEntry(text); setJdText(text); setJdState('ready'); setJdMessage(t.jdUploaded); setJdSource(language === 'zh' ? '上传文件' : 'Uploaded file');
+      trackEvent('jd_file_upload_completed', { file_type: extension, extraction: usedOcr ? 'ocr' : 'local' });
+      trackEvent('jd_input_ready', { method: usedOcr ? 'file_ocr' : 'file' });
+      jdReadyTracked.current = true;
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'OCR_FAILED';
+      const message = code === 'OCR_NOT_CONFIGURED' ? t.ocrNotConfigured
+        : code === 'OCR_AUTH' ? t.ocrAuth
+          : code === 'OCR_RATE_LIMIT' ? t.ocrRate
+            : code === 'SITE_RATE_LIMIT' ? t.siteRate
+              : code === 'OCR_TIMEOUT' || code === 'READ_TIMEOUT' ? t.ocrTimeout
+                : code === 'OCR_PAGE_LIMIT' ? t.ocrPageLimit
+                  : t.ocrFailed;
+      setJdEntry(''); setJdText(''); setJdState('error'); setJdMessage(message);
+      trackEvent('jd_file_upload_failed', { reason: code.slice(0, 36), file_type: extension });
+    }
+  }
+
   function handleJdEntry(value: string) {
-    setJdEntry(value); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation(''); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt('');
+    setJdFile(null); setJdFileName(''); setJdEntry(value); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation(''); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt('');
     if (/^https?:\/\//i.test(value.trim())) { setJdText(''); setJdState('idle'); jdReadyTracked.current = false; }
     else {
       const ready = value.trim().length >= 80;
@@ -546,7 +641,12 @@ export default function NewMatchPage() {
     { id: 'minimal', name: t.templateMinimal, description: t.templateMinimalBody },
   ];
   const draftConfirmed = confirmedDraft.length >= 80 && confirmedDraft === reviewDraft;
-  const confirmedPreviewBlocks = draftConfirmed ? reviewPreviewBlocks : parseReviewBlocks(confirmedDraft);
+
+  useEffect(() => {
+    if (screen !== 'review' || !reviewReady || exportReadyTrackedRef.current) return;
+    exportReadyTrackedRef.current = true;
+    trackEvent('export_ready_viewed', { template: selectedTemplate });
+  }, [reviewReady, screen, selectedTemplate]);
 
   function buildTextReview() {
     if (!analysis) return;
@@ -572,6 +672,7 @@ export default function NewMatchPage() {
     setReviewBlocks(parseReviewBlocks(merged));
     reviewUndoRef.current = [];
     reviewRedoRef.current = [];
+    exportReadyTrackedRef.current = false;
     reviewMergeAtRef.current = 0;
     setConfirmedDraft('');
     setConfirmedAt('');
@@ -580,11 +681,14 @@ export default function NewMatchPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function confirmTextDraft() {
-    if (!reviewReady) return;
-    setConfirmedDraft(reviewDraft);
-    setConfirmedAt(new Date().toISOString());
-    trackEvent('review_draft_confirmed', { adopted_suggestions: adoptedSuggestions.length, template: selectedTemplate });
+  function confirmDraftForExport() {
+    if (!reviewReady) return false;
+    if (!draftConfirmed) {
+      setConfirmedDraft(reviewDraft);
+      setConfirmedAt(new Date().toISOString());
+      trackEvent('review_draft_confirmed', { adopted_suggestions: adoptedSuggestions.length, template: selectedTemplate });
+    }
+    return true;
   }
 
   function editReviewDraft(value: string) {
@@ -640,8 +744,8 @@ export default function NewMatchPage() {
   }
 
   function downloadResumeHtml() {
-    if (!confirmedDraft) return;
-    const html = standaloneResumeHtml(confirmedPreviewBlocks, selectedTemplate, language);
+    if (!confirmDraftForExport()) return;
+    const html = standaloneResumeHtml(reviewPreviewBlocks, selectedTemplate, language);
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -650,10 +754,28 @@ export default function NewMatchPage() {
     anchor.click();
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    trackEvent('resume_export_started', { format: 'html', template: selectedTemplate });
     trackEvent('resume_exported', { format: 'html', template: selectedTemplate });
   }
 
+  async function downloadResumeDocx() {
+    if (!confirmDraftForExport()) return;
+    trackEvent('resume_export_started', { format: 'docx', template: selectedTemplate });
+    const blob = await resumeDocxBlob(reviewPreviewBlocks, language);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${resumeFileBase()}.docx`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    trackEvent('resume_exported', { format: 'docx', template: selectedTemplate });
+  }
+
   function printResume() {
+    if (!confirmDraftForExport()) return;
+    trackEvent('resume_export_started', { format: 'print_pdf', template: selectedTemplate });
     const previousTitle = document.title;
     document.title = resumeFileBase();
     window.print();
@@ -668,6 +790,8 @@ export default function NewMatchPage() {
     setResumeName('');
     setResumeText(nextResume);
     setResumeState(nextResume.trim().length >= 80 ? 'ready' : 'idle');
+    setJdFile(null);
+    setJdFileName('');
     setJdEntry('');
     setJdText('');
     setJdSource('');
@@ -695,7 +819,7 @@ export default function NewMatchPage() {
   async function runAiAnalysis() {
     if (!resumeReady || !jdReady || analysisState === 'working') return;
     setAnalysisSeconds(0); setAnalysisState('working'); setAnalysisError(''); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBlocks([]); setConfirmedDraft(''); setConfirmedAt('');
-    trackEvent('analysis_started', { resume_method: resumeMode, jd_method: looksLikeUrl ? 'url' : 'paste', language });
+    trackEvent('analysis_started', { resume_method: resumeMode, jd_method: jdFile ? 'file' : looksLikeUrl ? 'url' : 'paste', language });
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 70_000);
     try {
@@ -774,9 +898,12 @@ export default function NewMatchPage() {
         <section className="workspace-main" aria-labelledby="workspace-title">
           <header className="workspace-header">
             <div><h1 id="workspace-title">{t.workspaceTitle}</h1><p>{t.workspaceBody}</p></div>
-            <div className="material-status" aria-label={language === 'zh' ? '材料状态' : 'Material status'}>
-              <span className={resumeReady ? 'is-ready' : ''}>{resumeReady ? t.resumeReady : t.resumeWaiting}</span>
-              <span className={jdReady ? 'is-ready' : ''}>{jdReady ? t.jdReady : t.jdWaiting}</span>
+            <div className="workspace-header-actions">
+              <div className="material-status" aria-label={language === 'zh' ? '材料状态' : 'Material status'}>
+                <span className={resumeReady ? 'is-ready' : ''}>{resumeReady ? t.resumeReady : t.resumeWaiting}</span>
+                <span className={jdReady ? 'is-ready' : ''}>{jdReady ? t.jdReady : t.jdWaiting}</span>
+              </div>
+              {!resumeReady && !jdReady && <button type="button" className="demo-material-button" onClick={activateDemo}>{t.demoAction}<span aria-hidden="true">↗</span></button>}
             </div>
           </header>
 
@@ -804,6 +931,12 @@ export default function NewMatchPage() {
 
             <article className="material-card">
               <header><div><h2>{t.jdTitle}</h2><p>{t.jdBody}</p></div><span className={jdReady ? 'material-check is-ready' : 'material-check'}>{jdReady ? '✓' : '-'}</span></header>
+              <label className={`jd-file-upload${jdState === 'ready' && jdFile ? ' is-success' : ''}`}>
+                <input type="file" accept={JD_FILE_ACCEPT} onChange={handleJdFile} />
+                <span className="file-type" aria-hidden="true">{jdFile ? resumeFileTag(jdFile) : '＋'}</span>
+                <span><b>{jdState === 'working' ? t.jdReading : jdFile ? jdFileName : t.jdUpload}</b><small>{jdFile ? `${(jdFile.size / 1024 / 1024).toFixed(2)} MB` : t.jdUploadHint}</small></span>
+              </label>
+              <div className="material-or"><span>{language === 'zh' ? '或粘贴' : 'or paste'}</span></div>
               <label className="universal-jd"><textarea value={jdEntry} rows={11} placeholder={t.jdPlaceholder} onChange={(event) => handleJdEntry(event.target.value)} />{!looksLikeUrl && <small>{jdEntry.length.toLocaleString()} {t.characters}</small>}</label>
               {looksLikeUrl && <button type="button" className="parse-link-button" disabled={jdState === 'working'} onClick={parseJobLink}>{jdState === 'working' ? t.parsingLink : t.parseLink}<span aria-hidden="true">→</span></button>}
               {jdSource && <p className="source-detected"><span>{t.detected}</span><b>{jdSource}</b></p>}
@@ -870,9 +1003,9 @@ export default function NewMatchPage() {
           <div className="text-review-actions">
             <button type="button" onClick={() => setScreen('results')}><span aria-hidden="true">←</span>{t.reviewBack}</button>
             <div className="review-export-actions">
-              {!draftConfirmed && <button type="button" disabled={!reviewReady} onClick={confirmTextDraft}>{t.reviewNext}<span aria-hidden="true">→</span></button>}
-              <button type="button" disabled={!draftConfirmed} onClick={downloadResumeHtml}>{t.exportDownload}</button>
-              <button type="button" disabled={!draftConfirmed} onClick={printResume}>{t.exportPrint}</button>
+              <button type="button" disabled={!reviewReady} onClick={printResume}>{t.exportPrint}<span aria-hidden="true">→</span></button>
+              <button type="button" disabled={!reviewReady} onClick={downloadResumeDocx}>{t.exportDocx}</button>
+              <details className="export-more"><summary>{t.exportMore}</summary><button type="button" disabled={!reviewReady} onClick={downloadResumeHtml}>{t.exportDownload}</button></details>
               {draftConfirmed && <button type="button" className="is-secondary" onClick={startAnotherMatch}>{t.exportAnother}</button>}
             </div>
           </div>
