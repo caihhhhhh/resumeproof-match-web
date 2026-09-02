@@ -1,6 +1,6 @@
 # ResumeProof UTM 渠道管理手册
 
-更新日期：2026-08-30  
+更新日期：2026-09-02
 网站主页：<https://resumeproof.szw19990924.chatgpt.site/>
 
 ## 1. 使用原则
@@ -49,6 +49,12 @@ ResumeProof 当前记录以下三个归因字段：
 | 小红书 | <https://resumeproof.szw19990924.chatgpt.site/?utm_source=xiaohongshu&utm_medium=social&utm_campaign=launch_202608> |
 | V2EX | <https://resumeproof.szw19990924.chatgpt.site/?utm_source=v2ex&utm_medium=community&utm_campaign=launch_202608> |
 | GitHub | <https://resumeproof.szw19990924.chatgpt.site/?utm_source=github&utm_medium=referral&utm_campaign=launch_202608> |
+
+GitHub 网站源码仓库中的长期入口单独使用：
+
+<https://resumeproof.szw19990924.chatgpt.site/?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609>
+
+这样可以把“以前发布帖子带来的流量”与“长期从源码仓库进入的流量”分开。
 
 ## 4. Campaign 命名建议
 

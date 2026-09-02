@@ -128,7 +128,7 @@ function compactComparableText(value: string) {
 
 function parseReviewBlocks(value: string): ReviewBlock[] {
   const previewValue = value
-    .replace(/Will Shen\s+International Growth Marketing\s*[·|]?\s*GTM Execution/gi, '\n')
+    .replace(/^[^\n]{1,80}\s+International Growth Marketing\s*[·|]?\s*GTM Execution$/gim, '\n')
     .replace(/实习经历（续）/g, '\n')
     .replace(/(AI 项目|教育经历|专业技能)/g, '\n$1\n')
     .replace(/(AI 辅助广告分析｜个人项目)(?=使用)/g, '$1\n')
