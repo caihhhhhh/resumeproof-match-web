@@ -62,6 +62,8 @@ GitHub 网站源码仓库中的长期入口单独使用：
 | --- | --- | --- |
 | 首次公开发布 | `launch_202608` | 当前首轮推广 |
 | 新版本更新 | `product_update_v16` | 版本功能发布 |
+| Skill 仓库长期入口 | `skill_repo_202609` | 从 `resume-proof-match` README 和 About 进入 |
+| 网站源码仓库入口 | `website_repo_202609` | 从 `resumeproof-match-web` README 和 About 进入 |
 | 案例内容 | `resume_case_01` | 简历匹配案例 |
 | 教程内容 | `jd_match_guide` | 使用教程或方法论 |
 | 长期个人主页链接 | `evergreen_profile` | 不随单次活动变化 |
