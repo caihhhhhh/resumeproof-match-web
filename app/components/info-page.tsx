@@ -7,7 +7,7 @@ import { SiteFooter } from './site-footer';
 type InfoKind = 'about' | 'privacy' | 'terms';
 type Section = { title: string; paragraphs: string[]; items?: string[] };
 
-const repository = 'https://github.com/caihhhhhh/resume-proof';
+const repository = 'https://github.com/caihhhhhh/resumeproof-match-web';
 
 const content: Record<'zh' | 'en', Record<InfoKind, { eyebrow: string; title: string; intro: string; updated?: string; sections: Section[] }>> = {
   zh: {

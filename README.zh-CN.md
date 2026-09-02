@@ -8,7 +8,7 @@ ResumeProof Match 会把 JD 要求与可核对的简历原句逐条对照，说�
 
 想先看完整效果？[直接打开示例](https://resumeproof.szw19990924.chatgpt.site/match/new?demo=1&utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)，不需要上传文件。
 
-[English](README.md) · [配套 AI Agent Skill](https://github.com/caihhhhhh/resume-proof-match) · [隐私说明](https://resumeproof.szw19990924.chatgpt.site/privacy?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)
+[English](README.md) · [简历匹配方法](https://resumeproof.szw19990924.chatgpt.site/guide?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609) · [配套 AI Agent Skill](https://github.com/caihhhhhh/resume-proof-match) · [隐私说明](https://resumeproof.szw19990924.chatgpt.site/privacy?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)
 
 ![ResumeProof Match](public/og.png)
 

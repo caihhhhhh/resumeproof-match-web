@@ -1,0 +1,76 @@
+# ResumeProof Match: agent-readable product summary
+
+Last updated: 2026-09-02
+Canonical website: https://resumeproof.szw19990924.chatgpt.site/
+
+## What ResumeProof Match is
+
+ResumeProof Match is an evidence-first resume and job-description matching web application. It is designed for job seekers who want to decide whether a role is worth pursuing, understand which requirements their resume can prove, and improve wording without inventing experience.
+
+The tool does not present keyword overlap as hiring probability. It separates three questions:
+
+1. Role fit: whether the candidate's real experience covers the work and hard requirements.
+2. Evidence coverage: whether the resume contains verifiable excerpts supporting those requirements.
+3. Resume expression: whether supported experience is written clearly enough to be recognized.
+
+## Supported inputs
+
+- Resume or job-description text pasted into the browser.
+- PDF, DOCX, TXT, Markdown, PNG, JPG, JPEG, and WebP files up to the limit shown in the interface.
+- Supported job-detail URLs. Some recruiting sites block reliable automated reading; when that happens, the tool asks the user to paste and review the complete JD instead of fabricating content.
+- Images and scanned PDFs can use visual recognition when the deployment has OCR configured.
+
+## Workflow
+
+1. Add a base resume and a target job description.
+2. Review the extracted text before analysis.
+3. Run semantic analysis of requirements and resume evidence.
+4. Inspect must-have, important, and bonus coverage, including the cited resume excerpts behind supported mappings.
+5. Review proposed edits, their reasons, and any evidence warning.
+6. Accept, reject, or edit each suggestion.
+7. Review and approve the complete text draft.
+8. Choose a resume layout and export HTML, PDF, or DOCX.
+
+## Evidence rules
+
+- Equivalent wording and transferable experience may support a requirement when a relevant resume excerpt exists.
+- A partial signal is not treated as complete ownership or complete qualification.
+- Missing evidence is shown as a gap.
+- Rewriting can make supported experience easier to see; it cannot create tools, responsibilities, metrics, or outcomes the candidate did not have.
+- The user must verify employers, job titles, dates, metrics, tools, and proper nouns before export.
+
+## Privacy model
+
+Regular PDF, DOCX, and text files are read in the browser where possible. Confirmed resume and JD text is sent to the configured semantic-analysis provider after the user starts analysis. Images and scanned PDFs may be sent to the configured vision provider for recognition.
+
+The public deployment has no user account system for the matching workflow. Drafts are retained only in the current browser tab. Optional quality-improvement samples require an explicit opt-in, are automatically redacted, can be deleted by reference, and are retained for no more than 30 days. Automated redaction may not catch every identifier.
+
+Basic product analytics excludes resume text, JD text, filenames, full job links, company names, and job titles. See the current privacy page for the complete policy: https://resumeproof.szw19990924.chatgpt.site/privacy
+
+## Limitations
+
+- AI analysis can misunderstand requirements, miss context, or suggest unsuitable wording.
+- Match scores do not predict ATS decisions, interviews, or offers.
+- Job-link extraction depends on the source site's public accessibility and can fail when content is gated, rendered differently, or protected from automated access.
+- ResumeProof Match is not a recruiter and does not apply to jobs on the user's behalf.
+
+## Open-source components
+
+Website source and self-hosting guide:
+https://github.com/caihhhhhh/resumeproof-match-web
+
+AI-agent Skill, deterministic scoring contract, approval, QA, and delivery workflow:
+https://github.com/caihhhhhh/resume-proof-match
+
+Matching model:
+https://github.com/caihhhhhh/resume-proof-match/blob/main/references/matching.md
+
+## Public pages
+
+- Chinese homepage: https://resumeproof.szw19990924.chatgpt.site/
+- English homepage: https://resumeproof.szw19990924.chatgpt.site/en
+- Chinese guide: https://resumeproof.szw19990924.chatgpt.site/guide
+- English guide: https://resumeproof.szw19990924.chatgpt.site/en/guide
+- About: https://resumeproof.szw19990924.chatgpt.site/about
+- Privacy: https://resumeproof.szw19990924.chatgpt.site/privacy
+- Terms: https://resumeproof.szw19990924.chatgpt.site/terms

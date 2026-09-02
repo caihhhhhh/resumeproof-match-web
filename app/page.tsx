@@ -8,6 +8,7 @@ import { trackEvent } from './lib/analytics';
 const copy = {
   zh: {
     navHow: '工作方式',
+    navGuide: '匹配方法',
     navPrivacy: '隐私原则',
     kicker: '证据优先的岗位匹配',
     titleOne: '先看清是否适合，',
@@ -42,6 +43,7 @@ const copy = {
   },
   en: {
     navHow: 'How it works',
+    navGuide: 'Matching guide',
     navPrivacy: 'Privacy',
     kicker: 'Evidence-first job matching',
     titleOne: 'See if you fit.',
@@ -89,6 +91,7 @@ export default function Home() {
         </a>
         <div className="nav-links">
           <a href="#how">{t.navHow}</a>
+          <Link href={language === 'zh' ? '/guide' : '/en/guide'}>{t.navGuide}</Link>
           <a href="#privacy">{t.navPrivacy}</a>
           <button type="button" className="language-button" onClick={toggleLanguage} aria-label={language === 'zh' ? 'Switch to English' : '切换到中文'}>
             {language === 'zh' ? 'EN' : '中文'}

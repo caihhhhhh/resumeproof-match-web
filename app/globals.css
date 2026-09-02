@@ -987,6 +987,19 @@ a { color: inherit; text-decoration: none; }
 .info-sections li { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); color: #343a44; font-size: 14px; }
 .info-sections li::before { counter-increment: info-list; content: counter(info-list, decimal-leading-zero); color: var(--cobalt); font-family: var(--font-geist-mono), monospace; font-size: 10px; }
 .info-external-link { margin-top: 16px; }
+.guide-article .info-hero h1 { max-width: 15ch; }
+.guide-table { margin-top: 28px; border-top: 1px solid var(--line-strong); }
+.guide-table > div { display: grid; grid-template-columns: minmax(120px, .38fr) minmax(0, 1fr); gap: 28px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.guide-table strong { font-size: 14px; font-weight: 650; }
+.guide-table p { margin: 0; }
+.guide-steps { margin: 28px 0 0; padding: 0; list-style: none; counter-reset: guide-step; }
+.guide-steps li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; padding: 15px 0; border-top: 1px solid var(--line); color: #343a44; font-size: 15px; line-height: 1.72; }
+.guide-steps li::before { counter-increment: guide-step; content: counter(guide-step, decimal-leading-zero); color: var(--cobalt); font-family: var(--font-geist-mono), monospace; font-size: 10px; padding-top: 5px; }
+.guide-faq { border-top: 1px solid var(--line-strong); }
+.guide-faq details { border-bottom: 1px solid var(--line); }
+.guide-faq summary { padding: 19px 34px 19px 0; font-size: 15px; font-weight: 630; line-height: 1.45; cursor: pointer; }
+.guide-faq details p { max-width: 58ch; padding: 0 0 20px; }
+.guide-action { width: fit-content; margin-top: 30px; }
 .draft-status { max-width: 33rem; margin: 0; color: #795713; font-size: 10px; line-height: 1.5; text-align: right; }
 .draft-status.is-confirmed { color: #16784e; }
 .text-review-grid { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); align-items: start; gap: 20px; margin-top: 34px; }
@@ -1208,6 +1221,7 @@ a { color: inherit; text-decoration: none; }
   .info-hero h1 { font-size: clamp(48px, 14vw, 68px); }
   .info-hero > div { grid-column: 1; padding-top: 0; }
   .info-sections > section { grid-template-columns: 1fr; gap: 22px; padding: 42px 0; }
+  .guide-table > div { grid-template-columns: 1fr; gap: 8px; }
   .site-nav { min-height: 66px; }
   .wordmark > span:last-child { display: none; }
   .nav-links a:first-child { display: none; }

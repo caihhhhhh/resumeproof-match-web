@@ -8,7 +8,7 @@ ResumeProof Match compares every job requirement with verifiable resume excerpts
 
 Prefer to look around first? [Open the complete example](https://resumeproof.szw19990924.chatgpt.site/match/new?demo=1&utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609). No files needed.
 
-[中文说明](README.zh-CN.md) · [AI-agent skill](https://github.com/caihhhhhh/resume-proof-match) · [Privacy](https://resumeproof.szw19990924.chatgpt.site/privacy?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)
+[中文说明](README.zh-CN.md) · [Matching guide](https://resumeproof.szw19990924.chatgpt.site/en/guide?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609) · [AI-agent skill](https://github.com/caihhhhhh/resume-proof-match) · [Privacy](https://resumeproof.szw19990924.chatgpt.site/privacy?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)
 
 ![ResumeProof Match](public/og.png)
 

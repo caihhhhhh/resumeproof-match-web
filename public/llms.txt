@@ -1,0 +1,29 @@
+# ResumeProof Match
+
+> ResumeProof Match is an evidence-first AI tool for comparing a resume with a job description, verifying each match against resume excerpts, reviewing suggested edits, and exporting an approved resume.
+
+Primary language: Simplified Chinese. English content is also available.
+Last updated: 2026-09-02.
+
+## Key pages
+
+- [Chinese homepage](https://resumeproof.szw19990924.chatgpt.site/): Product overview and entry point.
+- [English homepage](https://resumeproof.szw19990924.chatgpt.site/en): English product overview.
+- [Chinese resume matching guide](https://resumeproof.szw19990924.chatgpt.site/guide): Evidence-first method, common mistakes, and FAQs.
+- [English resume matching guide](https://resumeproof.szw19990924.chatgpt.site/en/guide): Evidence-first method, common mistakes, and FAQs.
+- [About](https://resumeproof.szw19990924.chatgpt.site/about): Purpose, workflow, and boundaries.
+- [Privacy](https://resumeproof.szw19990924.chatgpt.site/privacy): Data handling and user controls.
+- [Web app source](https://github.com/caihhhhhh/resumeproof-match-web): Website source and self-hosting documentation.
+- [AI-agent Skill](https://github.com/caihhhhhh/resume-proof-match): Open-source matching and delivery workflow.
+
+## Core principles
+
+- Role fit, evidence coverage, and resume expression are separate judgments.
+- A supported match must point to a verifiable resume excerpt.
+- Missing experience remains a gap; it is not converted into a keyword or invented claim.
+- Suggested edits require user review before they enter the final draft.
+- Scores are decision aids, not ATS pass probabilities or hiring predictions.
+
+## More detail
+
+- [Full agent-readable product summary](https://resumeproof.szw19990924.chatgpt.site/llms-full.txt)
