@@ -6,6 +6,8 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "doctor": "node scripts/check-setup.mjs",
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",

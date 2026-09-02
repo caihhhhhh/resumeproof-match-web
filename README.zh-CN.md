@@ -1,21 +1,25 @@
 # ResumeProof Match
 
-一个“证据优先”的简历与 JD 匹配工具。它不只给一个模糊分数，而是把岗位要求与简历原句逐条对照，说明差距，并让用户审核每一处改写后再导出。
+## 先判断简历是否适合这个岗位，再看证据在哪里。
 
-[体验在线网站](https://resumeproof.szw19990924.chatgpt.site/?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609) · [English](README.md) · [配套 AI Agent Skill](https://github.com/caihhhhhh/resume-proof-match)
+ResumeProof Match 会把 JD 要求与可核对的简历原句逐条对照，说明差距，并让你审核每一处改写后再导出新简历。
+
+**[打开网站，开始匹配简历与 JD →](https://resumeproof.szw19990924.chatgpt.site/match/new?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)**
+
+想先看完整效果？[直接打开示例](https://resumeproof.szw19990924.chatgpt.site/match/new?demo=1&utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)，不需要上传文件。
+
+[English](README.md) · [配套 AI Agent Skill](https://github.com/caihhhhhh/resume-proof-match) · [隐私说明](https://resumeproof.szw19990924.chatgpt.site/privacy?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)
 
 ![ResumeProof Match](public/og.png)
 
-## 能做什么
+## 为什么用网站
 
-- 读取 PDF、DOCX、TXT、Markdown、PNG、JPG 和 WebP 格式的简历与 JD。
-- 尝试解析职位链接；页面无法稳定读取时，明确请用户粘贴并审核原文。
-- 使用语义分析，而不是只做关键词命中。
-- 分开判断“岗位适配”“证据覆盖”和“简历表达”。
-- 为匹配结论引用可核对的简历原句。
-- 给出改写建议及原因，用户可以采用、拒绝或继续编辑。
-- 提供结构化全文编辑、3 种版式，以及 HTML、PDF 和 DOCX 导出。
-- 支持可选 OCR、中英文界面、隐私控制、GA4 漏斗分析和私有管理后台。
+- **看到“为什么匹配”。** 每条成立的要求都会引用简历原句。
+- **找真实差距，而不是只找缺失的关键词。** 语义分析可以识别同义表达和可迁移经验。
+- **改不改由你决定。** 每条建议都可以采用、拒绝或继续编辑。
+- **在同一条流程中完成。** 审核全文、选择版式，再导出 HTML、PDF 或 DOCX。
+
+支持 PDF、DOCX、TXT、Markdown、PNG、JPG 和 WebP，也可以粘贴文字或提供可读取的职位链接。网站还包含 OCR、中英文界面、隐私控制、GA4 漏斗分析和私有管理后台。
 
 ## 使用流程
 
@@ -29,17 +33,27 @@
 HTML / PDF / DOCX
 ```
 
+## 选择使用方式
+
+| 你想做什么 | 建议方式 |
+| --- | --- |
+| 现在就匹配一份简历 | [直接使用在线网站](https://resumeproof.szw19990924.chatgpt.site/match/new?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609) |
+| 不上传文件，先看完整流程 | [加载完整示例](https://resumeproof.szw19990924.chatgpt.site/match/new?demo=1&utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609) |
+| 运行一个数据隔离的自建版本 | 按照下方步骤和[部署指南](docs/deployment.zh-CN.md) |
+| 在 AI Agent 中使用这套方法 | 安装 [ResumeProof Match Skill](https://github.com/caihhhhhh/resume-proof-match) |
+
 ## 本地运行
 
 需要 Node.js 22.13 或更高版本。
 
 ```bash
 npm ci
-cp .env.example .env.local
+npm run setup
+npm run doctor
 npm run dev
 ```
 
-打开 `http://localhost:3000`。AI 分析和 OCR 需要在服务端配置密钥；不配置密钥也可以查看界面与示例流程。
+打开 `http://localhost:3000`。初始化脚本不会覆盖已有配置；检查脚本只说明哪些能力已就绪，不会打印密钥。在没有配置 AI Key 前，也可以查看界面和完整示例。
 
 环境变量说明见 [`.env.example`](.env.example)。不要提交 `.env.local`、API Key、服务账号 JSON 或真实简历。
 
@@ -58,6 +72,8 @@ npm run build
 
 ## 文档
 
+- [自行部署指南](docs/deployment.zh-CN.md)
+- [Self-hosting and deployment](docs/deployment.md)
 - [GA4 后台配置](docs/ga4-admin-setup.zh-CN.md)
 - [UTM 渠道管理手册](docs/utm-channel-playbook.zh-CN.md)
 

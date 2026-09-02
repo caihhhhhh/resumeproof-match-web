@@ -1,21 +1,25 @@
 # ResumeProof Match
 
-Evidence-first resume and job-description matching. ResumeProof Match checks role requirements against verifiable resume excerpts, explains gaps, and lets the user approve every rewrite before exporting a new resume.
+## See whether your resume fits the job — and the evidence behind the answer.
 
-[Try the live website](https://resumeproof.szw19990924.chatgpt.site/?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609) · [中文说明](README.zh-CN.md) · [Related AI-agent skill](https://github.com/caihhhhhh/resume-proof-match)
+ResumeProof Match compares every job requirement with verifiable resume excerpts, explains the gaps, and lets you approve every edit before exporting a new resume.
+
+**[Match a resume to a job on the live website →](https://resumeproof.szw19990924.chatgpt.site/match/new?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)**
+
+Prefer to look around first? [Open the complete example](https://resumeproof.szw19990924.chatgpt.site/match/new?demo=1&utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609). No files needed.
+
+[中文说明](README.zh-CN.md) · [AI-agent skill](https://github.com/caihhhhhh/resume-proof-match) · [Privacy](https://resumeproof.szw19990924.chatgpt.site/privacy?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609)
 
 ![ResumeProof Match](public/og.png)
 
-## What it does
+## Why use the website
 
-- Accepts PDF, DOCX, TXT, Markdown, PNG, JPG, and WebP resumes or job descriptions.
-- Reads supported job links and falls back to reviewed pasted text when a source blocks reliable extraction.
-- Uses semantic analysis instead of keyword-only matching.
-- Separates role fit, evidence coverage, and resume expression.
-- Cites the resume excerpt behind each supported requirement.
-- Produces proposed rewrites with reasons; no suggestion is applied automatically.
-- Provides a structured full-text editor, three layouts, and HTML, PDF, or DOCX export.
-- Includes optional OCR, bilingual UI, privacy controls, GA4 funnel analytics, and a private admin dashboard.
+- **See why something matches.** Every supported requirement points back to a resume excerpt.
+- **Find real gaps, not missing keywords.** Semantic analysis recognizes equivalent wording and transferable experience.
+- **Keep control of the rewrite.** Accept, reject, or edit each suggestion before it reaches the final draft.
+- **Finish in one flow.** Review the complete text, choose a layout, and export HTML, PDF, or DOCX.
+
+Upload PDF, DOCX, TXT, Markdown, PNG, JPG, or WebP files, paste text, or provide a supported job link. OCR, bilingual UI, privacy controls, GA4 funnel analytics, and a private admin dashboard are also included.
 
 ## Product flow
 
@@ -29,17 +33,27 @@ Full-text approval
 HTML / PDF / DOCX
 ```
 
+## Use it your way
+
+| Goal | Best route |
+| --- | --- |
+| Match a resume now | [Use the live website](https://resumeproof.szw19990924.chatgpt.site/match/new?utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609) |
+| Inspect the full flow without uploading | [Load the complete example](https://resumeproof.szw19990924.chatgpt.site/match/new?demo=1&utm_source=github&utm_medium=referral&utm_campaign=website_repo_202609) |
+| Run your own isolated instance | Follow the setup below and [deployment guide](docs/deployment.md) |
+| Use the method inside an AI agent | Install the [ResumeProof Match skill](https://github.com/caihhhhhh/resume-proof-match) |
+
 ## Local development
 
 Requirements: Node.js 22.13 or later.
 
 ```bash
 npm ci
-cp .env.example .env.local
+npm run setup
+npm run doctor
 npm run dev
 ```
 
-Open `http://localhost:3000`. AI analysis and OCR require server-side keys; the interface and demo route can still be inspected without placing secrets in client code.
+Open `http://localhost:3000`. The setup command creates local configuration without overwriting existing files. The doctor reports which capabilities are ready without printing secret values. The interface and built-in example work before AI keys are added.
 
 ### Environment variables
 
@@ -73,6 +87,8 @@ Do not open an issue containing a resume, job application, API key, or other per
 
 ## Documentation
 
+- [Self-hosting and deployment](docs/deployment.md)
+- [自行部署指南](docs/deployment.zh-CN.md)
 - [GA4 admin setup (Chinese)](docs/ga4-admin-setup.zh-CN.md)
 - [UTM channel playbook (Chinese)](docs/utm-channel-playbook.zh-CN.md)
 
