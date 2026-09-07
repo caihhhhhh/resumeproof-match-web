@@ -1,4 +1,4 @@
-import type { EvidenceItem, MatchAnalysis, OptimizationSuggestion, RequirementImportance, ScoreBreakdown } from '../../../lib/match-analysis';
+import type { ApplicationDecision, EvidenceItem, HardRequirement, MatchAnalysis, OptimizationSuggestion, RequirementImportance, ScoreBreakdown } from '../../../lib/match-analysis';
 import { saveConsentedSample } from '../../../lib/content-samples';
 import { guardApiRequest, privateJson } from '../../../lib/request-guard';
 import { trackRuntimeResponse } from '../../../lib/runtime-telemetry';
@@ -8,6 +8,7 @@ export const runtime = 'nodejs';
 const CORE_EXAMPLE = {
   summary: 'one concise conclusion',
   strengths: ['strength'], gaps: ['gap'],
+  hardRequirements: [{ requirement: 'explicit eligibility gate from the JD', category: 'language', sourceIds: [], rationale: 'why the source proves or does not prove this gate', status: 'unverified' }],
   evidence: [{ requirement: 'JD requirement', importance: 'must', sourceIds: [1], rationale: 'short semantic explanation', status: 'strong' }],
 };
 
@@ -19,10 +20,12 @@ type RawCore = {
   summary: string;
   strengths: string[];
   gaps: string[];
+  hardRequirements: RawHardRequirement[];
   evidence: RawEvidence[];
 };
 
 type RawEvidence = Omit<EvidenceItem, 'resumeEvidence'> & { sourceIds: number[] };
+type RawHardRequirement = Omit<HardRequirement, 'resumeEvidence'> & { sourceIds: number[] };
 type RawSuggestion = Omit<OptimizationSuggestion, 'originalText' | 'sourceStart' | 'sourceEnd'> & { sourceId: number };
 type ResumeSource = { text: string; start: number; end: number };
 
@@ -101,10 +104,14 @@ function parseCore(content: string | null): RawCore {
   const value = parseJsonObject(content);
   if (!value || typeof value !== 'object') throw new Error('INVALID_CORE');
   const raw = value as Partial<RawCore>;
+  const validHardRequirements = Array.isArray(raw.hardRequirements) && raw.hardRequirements.every((item) => item && typeof item.requirement === 'string'
+    && ['location', 'work_authorization', 'education', 'experience', 'language', 'industry', 'certification', 'other'].includes(item.category)
+    && ['met', 'unverified', 'not_met'].includes(item.status) && Array.isArray(item.sourceIds) && item.sourceIds.every(Number.isInteger)
+    && typeof item.rationale === 'string');
   const validEvidence = Array.isArray(raw.evidence) && raw.evidence.length > 0 && raw.evidence.every((item) => item && typeof item.requirement === 'string'
     && ['must', 'important', 'bonus'].includes(item.importance) && Array.isArray(item.sourceIds) && item.sourceIds.every(Number.isInteger)
     && typeof item.rationale === 'string' && ['strong', 'partial', 'gap'].includes(item.status));
-  if (typeof raw.summary !== 'string' || !Array.isArray(raw.strengths) || !Array.isArray(raw.gaps) || !validEvidence) throw new Error('INVALID_CORE');
+  if (typeof raw.summary !== 'string' || !Array.isArray(raw.strengths) || !Array.isArray(raw.gaps) || !validHardRequirements || !validEvidence) throw new Error('INVALID_CORE');
   return raw as RawCore;
 }
 
@@ -230,6 +237,25 @@ function verifiedEvidence(sources: ResumeSource[], raw: RawCore, language: 'zh' 
   }).slice(0, 8);
 }
 
+function verifiedHardRequirements(sources: ResumeSource[], raw: RawCore, language: 'zh' | 'en') {
+  return raw.hardRequirements.map((item) => {
+    const quotes = item.status === 'unverified' ? [] : item.sourceIds
+      .map((sourceId) => sources[sourceId - 1]?.text)
+      .filter((quote): quote is string => Boolean(quote))
+      .slice(0, 2);
+    const status = item.status !== 'unverified' && !quotes.length ? 'unverified' as const : item.status;
+    return {
+      requirement: item.requirement,
+      category: item.category,
+      status,
+      resumeEvidence: status === 'unverified' ? [] : quotes,
+      rationale: status === 'unverified' && item.status !== 'unverified'
+        ? (language === 'zh' ? '未找到能够核对这一硬条件的简历原句。' : 'No resume excerpt could verify this eligibility requirement.')
+        : item.rationale,
+    };
+  }).slice(0, 12);
+}
+
 function coreIsComplete(raw: RawCore | null, evidence: EvidenceItem[]) {
   if (!raw || !raw.summary.trim()) return false;
   return raw.strengths.some((item) => item.trim())
@@ -305,7 +331,7 @@ async function deepSeekCompletion(config: DeepSeekConfig, instructions: string, 
 
 async function requestCore(config: DeepSeekConfig, resume: string, jd: string, language: 'zh' | 'en', repair = false) {
   const numberedSources = resumeSources(resume).map((source, index) => `[${index + 1}] ${source.text}`).join('\n');
-  const instructions = `You are an evidence-first resume analyst. Analyze semantic equivalence and transferable experience, not identical keywords. Use ${language === 'zh' ? 'Chinese' : 'English'} for prose. Select 5-7 decision-relevant JD requirements and label importance as must, important, or bonus. Classify each as strong, partial, or gap. For strong or partial matches, cite 1-3 valid sourceIds from the numbered resume lines; for a true gap, use an empty sourceIds array. Do not copy source text into another field. Do not infer absent tools, seniority, ownership, metrics, dates, or achievements. Applying ads on a channel is not partner relationship management. Coordinating content is not the same as creating it, and "multilingual" does not prove a specific language. When evidence supports only part of a requirement, use partial rather than strong. Return 2-4 concrete strengths and 2-4 concrete gaps. Keep the summary to two sentences and every rationale to one concise sentence.${repair ? ' A previous response was missing or invalid. This is a repair request: ensure every required field is populated and the JSON is complete.' : ''} Return one JSON object only with exactly these keys and value types: ${JSON.stringify(CORE_EXAMPLE)}`;
+  const instructions = `You are an evidence-first resume analyst. Analyze semantic equivalence and transferable experience, not identical keywords. Use ${language === 'zh' ? 'Chinese' : 'English'} for prose. First extract every explicit eligibility gate in the JD: location or remote-region limits, work authorization or visa, education, years of experience, required language, mandatory industry background, required certification, and any other requirement clearly framed as mandatory. Put them in hardRequirements. Use category location, work_authorization, education, experience, language, industry, certification, or other; platform and tool requirements belong to other, while industry is reserved for sector background such as automotive, healthcare, or Web3. Classify each gate as met only with supporting resume sourceIds, not_met only when the resume explicitly contradicts it, or unverified when the resume is silent or ambiguous; unverified must use an empty sourceIds array. An empty hardRequirements array is valid only when the JD has no explicit eligibility gate. Then select 5-8 decision-relevant capability requirements and label importance as must, important, or bonus. Classify each as strong, partial, or gap. For strong or partial matches, cite 1-3 valid sourceIds from the numbered resume lines; for a true gap, use an empty sourceIds array. Do not copy source text into another field. Do not infer absent tools, seniority, ownership, metrics, dates, or achievements. Applying ads on a channel is not partner relationship management. Coordinating content is not the same as creating it, and "multilingual" does not prove a specific language. When evidence supports only part of a requirement, use partial rather than strong. Return 2-4 concrete strengths and 2-4 concrete gaps. Keep the summary to two sentences and every rationale to one concise sentence.${repair ? ' A previous response was missing or invalid. This is a repair request: ensure every required field is populated and the JSON is complete.' : ''} Return one JSON object only with exactly these keys and value types: ${JSON.stringify(CORE_EXAMPLE)}`;
   return parseCore(await deepSeekCompletion(config, instructions, `NUMBERED RESUME SOURCES\n---\n${numberedSources}\n---\nJOB DESCRIPTION\n---\n${jd}`, 1_700));
 }
 
@@ -370,6 +396,7 @@ export async function POST(request: Request) {
     : [];
   let raw = coreResult.status === 'fulfilled' ? coreResult.value : null;
   let evidence = raw ? verifiedEvidence(sources, raw, language) : [];
+  let hardRequirements = raw ? verifiedHardRequirements(sources, raw, language) : [];
 
   const repairTasks: Array<Promise<{ kind: 'core'; value: RawCore } | { kind: 'suggestions'; value: RawSuggestion[] }>> = [];
   if (!coreIsComplete(raw, evidence)) {
@@ -382,6 +409,7 @@ export async function POST(request: Request) {
       if (result.value.kind === 'core') {
         raw = result.value.value;
         evidence = verifiedEvidence(sources, raw, language);
+        hardRequirements = verifiedHardRequirements(sources, raw, language);
       } else {
         suggestions = result.value.value.map((item) => sanitizeSuggestion(resumeText, sources, item))
           .filter((item): item is OptimizationSuggestion => Boolean(item)).slice(0, 4);
@@ -406,10 +434,17 @@ export async function POST(request: Request) {
 
   const { overall, scoring } = scoreEvidence(evidence);
   const hasMustGap = evidence.some((item) => item.importance === 'must' && item.status === 'gap');
-  const grade = overall >= 80 && !hasMustGap && (scoring.mustCoverage ?? 0) >= 80 ? 'A' : overall >= 55 ? 'B' : 'C';
+  const hasHardFailure = hardRequirements.some((item) => item.status === 'not_met');
+  const hasUnverifiedGate = hardRequirements.some((item) => item.status === 'unverified');
+  const decision: ApplicationDecision = hasHardFailure || overall < 55 || hasMustGap
+    ? 'skip'
+    : hasUnverifiedGate || overall < 80 || (scoring.mustCoverage ?? 0) < 80
+      ? 'review_first'
+      : 'apply';
+  const grade = decision === 'apply' ? 'A' : decision === 'review_first' ? 'B' : 'C';
   const analysis: MatchAnalysis = {
     mode: 'ai',
-    summary: raw.summary, overall, grade, scoring,
+    summary: raw.summary, overall, grade, decision, hardRequirements, scoring,
     coveredTerms: raw.strengths.slice(0, 6), missingTerms: raw.gaps.slice(0, 6), evidence,
     metricSignals: metricSignals(resumeText), suggestions,
   };

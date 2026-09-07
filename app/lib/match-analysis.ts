@@ -1,5 +1,7 @@
 export type EvidenceStatus = 'strong' | 'partial' | 'gap';
 export type RequirementImportance = 'must' | 'important' | 'bonus';
+export type HardRequirementStatus = 'met' | 'unverified' | 'not_met';
+export type ApplicationDecision = 'apply' | 'review_first' | 'skip';
 
 export type ScoreBreakdown = {
   mustCoverage: number | null;
@@ -18,6 +20,14 @@ export type EvidenceItem = {
   resumeEvidence: string[];
   rationale: string;
   status: EvidenceStatus;
+};
+
+export type HardRequirement = {
+  requirement: string;
+  category: 'location' | 'work_authorization' | 'education' | 'experience' | 'language' | 'industry' | 'certification' | 'other';
+  status: HardRequirementStatus;
+  resumeEvidence: string[];
+  rationale: string;
 };
 
 export type OptimizationSuggestion = {
@@ -39,6 +49,8 @@ export type MatchAnalysis = {
   summary: string;
   overall: number;
   grade: 'A' | 'B' | 'C';
+  decision: ApplicationDecision;
+  hardRequirements: HardRequirement[];
   scoring: ScoreBreakdown;
   coveredTerms: string[];
   missingTerms: string[];
@@ -55,6 +67,13 @@ export function isMatchAnalysis(value: unknown): value is MatchAnalysis {
     && typeof analysis.summary === 'string' && analysis.summary.trim().length > 0
     && typeof analysis.overall === 'number' && Number.isInteger(analysis.overall) && analysis.overall >= 0 && analysis.overall <= 100
     && (analysis.grade === 'A' || analysis.grade === 'B' || analysis.grade === 'C')
+    && (analysis.decision === 'apply' || analysis.decision === 'review_first' || analysis.decision === 'skip')
+    && Array.isArray(analysis.hardRequirements)
+    && analysis.hardRequirements.every((item) => typeof item.requirement === 'string' && item.requirement.trim()
+      && ['location', 'work_authorization', 'education', 'experience', 'language', 'industry', 'certification', 'other'].includes(item.category)
+      && ['met', 'unverified', 'not_met'].includes(item.status)
+      && Array.isArray(item.resumeEvidence)
+      && typeof item.rationale === 'string' && item.rationale.trim())
     && Boolean(scoring) && typeof scoring?.verifiedEvidence === 'number'
     && typeof scoring?.totalRequirements === 'number' && scoring.totalRequirements >= 3
     && typeof scoring?.strongCount === 'number' && typeof scoring?.partialCount === 'number' && typeof scoring?.gapCount === 'number'

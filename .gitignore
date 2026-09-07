@@ -38,5 +38,6 @@ next-env.d.ts
 /outputs/
 /work/
 /promotion/
+/tmp/
 *.tsbuildinfo
 /.openai/hosting.json

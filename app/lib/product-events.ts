@@ -9,14 +9,17 @@ export const PRODUCT_EVENT_NAMES = new Set([
   'analysis_started', 'analysis_completed', 'analysis_failed',
   'result_feedback_submitted',
   'suggestion_reviewed', 'review_draft_built', 'review_draft_confirmed',
-  'demo_entry_clicked', 'demo_started', 'export_ready_viewed', 'resume_export_started', 'resume_exported',
+  'fact_change_reviewed', 'fact_review_completed',
+  'demo_entry_clicked', 'demo_started', 'export_ready_viewed', 'resume_export_started', 'resume_exported', 'resume_export_failed',
 ]);
 
 const PROPERTY_KEYS = new Set([
   'source', 'file_type', 'file_size', 'extraction', 'reason', 'method',
   'resume_method', 'jd_method', 'language', 'grade', 'score_band',
-  'suggestion_count', 'decision', 'adopted_suggestions', 'template', 'format',
+  'decision', 'hard_gate_count', 'unverified_gate_count', 'unmet_gate_count',
+  'suggestion_count', 'adopted_suggestions', 'template', 'format',
   'helpful', 'feedback_reason',
+  'fact_category', 'fact_change_count',
   'journey_id', 'acquisition_source', 'acquisition_medium', 'acquisition_campaign',
 ]);
 

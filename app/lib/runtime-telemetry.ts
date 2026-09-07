@@ -45,11 +45,21 @@ function database() {
 }
 
 async function ensureRuntimeSchema(db: D1Database) {
-  schemaReady ??= db.batch([
-    db.prepare(runtimeEventsSchema),
-    db.prepare(runtimeEventsTimeIndex),
-    db.prepare(runtimeEventsStatusIndex),
-  ]).then(() => undefined).catch((error) => {
+  schemaReady ??= (async () => {
+    await db.prepare(runtimeEventsSchema).run();
+    const tableInfo = await db.prepare('PRAGMA table_info(runtime_events)').all<{ name: string }>();
+    const existing = new Set((tableInfo.results ?? []).map((column) => column.name));
+    const additions = [
+      ['source', 'TEXT'], ['method', 'TEXT'],
+      ['input_tokens', 'INTEGER NOT NULL DEFAULT 0'], ['output_tokens', 'INTEGER NOT NULL DEFAULT 0'],
+      ['cache_hit_tokens', 'INTEGER NOT NULL DEFAULT 0'], ['cache_miss_tokens', 'INTEGER NOT NULL DEFAULT 0'],
+      ['estimated_cost_microusd', 'INTEGER'],
+    ].filter(([name]) => !existing.has(name));
+    if (additions.length) {
+      await db.batch(additions.map(([name, definition]) => db.prepare(`ALTER TABLE runtime_events ADD COLUMN ${name} ${definition}`)));
+    }
+    await db.batch([db.prepare(runtimeEventsTimeIndex), db.prepare(runtimeEventsStatusIndex)]);
+  })().catch((error) => {
     schemaReady = null;
     throw error;
   });

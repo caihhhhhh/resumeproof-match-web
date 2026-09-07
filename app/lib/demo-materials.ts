@@ -118,7 +118,15 @@ export function getDemoMaterials(language: 'zh' | 'en'): DemoMaterials {
       ? '核心 Campaign、渠道分析和跨团队协作要求均有直接证据；合作伙伴经验可以支持岗位，但英语能力仍需由候选人自行确认。'
       : 'The resume directly supports campaign ownership, channel analysis, and cross-functional work. Partner experience is relevant, while working-English ability still needs confirmation.',
     overall: 84,
-    grade: 'A',
+    grade: 'B',
+    decision: 'review_first',
+    hardRequirements: language === 'zh' ? [
+      { requirement: '3 年以上相关经验', category: 'experience', status: 'met', resumeEvidence: ['3 年增长营销经验'], rationale: '简历明确写出 3 年相关经验。' },
+      { requirement: '英语可作为工作语言', category: 'language', status: 'unverified', resumeEvidence: [], rationale: '简历没有可核对的英语使用场景或语言等级，需要候选人确认。' },
+    ] : [
+      { requirement: '3+ years of relevant experience', category: 'experience', status: 'met', resumeEvidence: ['Growth marketer with 3 years of experience'], rationale: 'The resume explicitly states three years of relevant experience.' },
+      { requirement: 'Professional working English', category: 'language', status: 'unverified', resumeEvidence: [], rationale: 'The resume does not provide a verifiable English level or working context, so the candidate must confirm it.' },
+    ],
     scoring: {
       mustCoverage: 88,
       importantCoverage: 83,
