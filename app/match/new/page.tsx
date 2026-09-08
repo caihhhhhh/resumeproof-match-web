@@ -423,7 +423,7 @@ export default function NewMatchPage() {
           window.localStorage.removeItem(BASE_RESUME_KEY);
         }
       } catch {
-        window.localStorage.removeItem(BASE_RESUME_KEY);
+        try { window.localStorage.removeItem(BASE_RESUME_KEY); } catch { /* Ignore unavailable browser storage. */ }
       }
     }, 0);
     return () => window.clearTimeout(timer);
