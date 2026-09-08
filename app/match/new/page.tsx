@@ -24,6 +24,7 @@ const ACCEPTED_RESUME_EXTENSIONS = new Set([
 
 const RESUME_FILE_ACCEPT = '.pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg,image/webp';
 const JD_FILE_ACCEPT = RESUME_FILE_ACCEPT;
+const BASE_RESUME_KEY = 'resumeproof-base-resume-v1';
 
 type StoredDraft = {
   screen: Screen;
@@ -50,11 +51,16 @@ type StoredDraft = {
   step?: number;
 };
 
+type StoredBaseResume = {
+  text: string;
+  savedAt: string;
+};
+
 const copy = {
   zh: {
     back: '返回首页', workspaceTitle: '先把两份材料放在一起。', workspaceBody: '文件优先在浏览器读取，并仅在当前标签页临时保留；开始分析后，简历与 JD 文字会发送至 AI 服务，扫描文件会使用视觉识别服务。',
     resumeReady: '简历已就绪', resumeWaiting: '等待简历', jdReady: 'JD 已就绪', jdWaiting: '等待 JD', localOnly: 'AI 语义分析',
-    resumeTitle: '基础简历', resumeBody: '上传文件，或直接粘贴简历文字。', upload: '上传文件', paste: '粘贴文字', chooseFile: '选择一份简历文件',
+    resumeTitle: '基础简历', resumeBody: '上传文件，或直接粘贴简历文字。可选保存一份本机基础版本。', upload: '上传文件', paste: '粘贴文字', chooseFile: '选择一份简历文件',
     fileHint: '最大 8 MB · PDF、DOCX、TXT、MD、PNG、JPG 或 WebP', reading: '正在读取并识别内容…', uploaded: '上传成功', parsed: '内容已读取，请先核对文字再开始匹配',
     pendingOcr: '文件已上传，但没有识别到足够文字。请重新上传或粘贴文字。', replace: '重新选择', unsupported: '暂不支持此格式，请上传 PDF、DOCX、TXT、MD、PNG、JPG 或 WebP。', tooLarge: '文件超过 8 MB。',
     ocrNotConfigured: '视觉识别服务尚未配置，请联系网站管理员。', ocrAuth: '视觉识别服务授权异常，请联系网站管理员。', ocrRate: '视觉识别请求过于频繁，请稍后重试。', ocrTimeout: '视觉识别超时，请重新上传。', ocrPageLimit: '扫描 PDF 最多支持 6 页，请上传精简版简历。', ocrFailed: '没有可靠识别出简历文字，请重新上传清晰文件或粘贴文字。',
@@ -76,12 +82,12 @@ const copy = {
     confirmedEyebrow: '文字审核已完成', confirmedTitle: '这份文字稿已锁定。', confirmedBody: '系统保存了当前全文快照。返回修改任何文字后，本次确认会自动失效；此操作不会生成 HTML、PDF 或其他文件。', confirmedSnapshot: '已确认全文', confirmedChanges: '采用修改', confirmedTime: '确认时间', confirmedEdit: '返回继续编辑', confirmedNext: '选择简历模板', confirmedNextHint: '先选择版式，不会立即生成文件。',
     templateEyebrow: '选择版式', templateTitle: '内容不变，只调整阅读节奏。', templateBody: '三个模板共用已确认文字。切换模板不会重写内容，也不会影响匹配报告。', templateBalanced: 'GTM 经典单栏', templateBalancedBody: '沿用 Will 的简历骨架：蓝灰标题、清晰时间轴与舒适行距。', templateCompact: 'GTM 紧凑单栏', templateCompactBody: '保持同一视觉体系，压缩段间距以容纳更长经历。', templateMinimal: 'GTM 极简单栏', templateMinimalBody: '保留版式节奏，降低色彩强调，让成果更突出。', templateSelected: '已选择', templateBack: '返回确认记录', templateContinue: '进入最终预览',
     exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '下载稳定 PDF', exportDocx: '下载 DOCX', exportMore: '更多格式', exportAnother: '用当前简历匹配新岗位', exportPrintHint: 'PDF 将直接生成 A4 文件，正文可选择并内嵌中文字体；DOCX 可继续在 Word 中编辑。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成', pdfCheckTitle: 'PDF 与 ATS 基础检查', pdfCheckBody: 'A4 单栏、固定页边距、可选择文字、受控分页；中文简历按需嵌入字体。', pdfGenerating: '正在生成 PDF…', pdfError: 'PDF 生成失败，请检查网络后重试，或先下载 DOCX。',
-    demoAction: '使用示例材料完整体验', demoLoaded: '示例材料与完整报告已载入',
+    demoAction: '使用示例材料完整体验', demoLoaded: '示例材料与完整报告已载入', saveBaseResume: '保存为本机基础简历', updateBaseResume: '更新本机基础简历', useBaseResume: '使用已保存版本', baseResumeSaved: '本机基础版本已保存', clearBaseResume: '清除本机版本', baseResumeHint: '只保存在这台设备的浏览器中，不会上传；清除浏览器数据后会消失。',
   },
   en: {
     back: 'Back home', workspaceTitle: 'Put both sources in one place.', workspaceBody: 'Files are read in your browser and kept only for this tab. Resume and JD text is sent to the AI service after you start analysis; scanned files use visual recognition.',
     resumeReady: 'Resume ready', resumeWaiting: 'Resume needed', jdReady: 'JD ready', jdWaiting: 'JD needed', localOnly: 'AI semantic analysis',
-    resumeTitle: 'Base resume', resumeBody: 'Upload a file or paste the complete resume.', upload: 'Upload file', paste: 'Paste text', chooseFile: 'Choose a resume file',
+    resumeTitle: 'Base resume', resumeBody: 'Upload a file or paste the complete resume. You can optionally keep one local base version.', upload: 'Upload file', paste: 'Paste text', chooseFile: 'Choose a resume file',
     fileHint: 'Up to 8 MB · PDF, DOCX, TXT, MD, PNG, JPG, or WebP', reading: 'Reading and recognizing content…', uploaded: 'Upload successful', parsed: 'Content extracted. Review the text before matching.',
     pendingOcr: 'The file uploaded, but not enough text was recognized. Upload it again or paste the text.', replace: 'Choose another', unsupported: 'Upload a PDF, DOCX, TXT, MD, PNG, JPG, or WebP file.', tooLarge: 'The file is larger than 8 MB.',
     ocrNotConfigured: 'Visual recognition is not configured. Contact the site administrator.', ocrAuth: 'Visual recognition has an authorization issue. Contact the site administrator.', ocrRate: 'Visual recognition is rate-limited. Try again shortly.', ocrTimeout: 'Visual recognition timed out. Upload the file again.', ocrPageLimit: 'Scanned PDFs can contain up to 6 pages. Upload a shorter resume.', ocrFailed: 'The resume text could not be read reliably. Upload a clearer file or paste the text.',
@@ -103,7 +109,7 @@ const copy = {
     confirmedEyebrow: 'Text review complete', confirmedTitle: 'This draft is now locked.', confirmedBody: 'The complete text snapshot has been saved. Editing any text will invalidate this confirmation. No HTML, PDF, or other file is created here.', confirmedSnapshot: 'Confirmed text', confirmedChanges: 'adopted changes', confirmedTime: 'Confirmed at', confirmedEdit: 'Return to edit', confirmedNext: 'Choose a template', confirmedNextHint: 'Choose the layout first. No file is generated yet.',
     templateEyebrow: 'Choose a layout', templateTitle: 'Keep the content. Change the reading rhythm.', templateBody: 'All three templates use the confirmed text. Switching layouts does not rewrite the resume or change the match report.', templateBalanced: 'GTM classic', templateBalancedBody: "Will's resume structure with blue-grey hierarchy, a clear timeline, and comfortable spacing.", templateCompact: 'GTM compact', templateCompactBody: 'The same visual system with tighter spacing for longer experience.', templateMinimal: 'GTM minimal', templateMinimalBody: 'The same reading rhythm with quieter color and more focus on outcomes.', templateSelected: 'Selected', templateBack: 'Back to confirmation', templateContinue: 'Open final preview',
     exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Download stable PDF', exportDocx: 'Download DOCX', exportMore: 'More formats', exportAnother: 'Match this resume to another job', exportPrintHint: 'PDF is generated directly as A4 with selectable text and embedded CJK fonts when needed. DOCX remains editable in Word.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready', pdfCheckTitle: 'PDF and ATS baseline', pdfCheckBody: 'A4 single column, fixed margins, selectable text, and controlled pagination. CJK fonts load only when needed.', pdfGenerating: 'Generating PDF…', pdfError: 'PDF generation failed. Check your connection and retry, or download DOCX.',
-    demoAction: 'Try the complete example', demoLoaded: 'Example materials and full report loaded',
+    demoAction: 'Try the complete example', demoLoaded: 'Example materials and full report loaded', saveBaseResume: 'Save as local base resume', updateBaseResume: 'Update local base resume', useBaseResume: 'Use saved version', baseResumeSaved: 'Local base version saved', clearBaseResume: 'Clear local version', baseResumeHint: 'Stored only in this browser on this device. It is not uploaded and disappears if browser data is cleared.',
   },
 } as const;
 
@@ -360,6 +366,7 @@ export default function NewMatchPage() {
   const [resumeName, setResumeName] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState('');
+  const [baseResume, setBaseResume] = useState<StoredBaseResume | null>(null);
   const [resumeNeedsReview, setResumeNeedsReview] = useState(false);
   const [resumeState, setResumeState] = useState<ParseState>('idle');
   const [resumeError, setResumeError] = useState('');
@@ -403,6 +410,24 @@ export default function NewMatchPage() {
   const previewMeasureRef = useRef<HTMLDivElement>(null);
   const demoAutoLoadedRef = useRef(false);
   const exportReadyTrackedRef = useRef(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem(BASE_RESUME_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw) as Partial<StoredBaseResume>;
+        if (typeof saved.text === 'string' && saved.text.trim().length >= 80 && typeof saved.savedAt === 'string') {
+          setBaseResume({ text: saved.text, savedAt: saved.savedAt });
+        } else {
+          window.localStorage.removeItem(BASE_RESUME_KEY);
+        }
+      } catch {
+        window.localStorage.removeItem(BASE_RESUME_KEY);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -603,6 +628,37 @@ export default function NewMatchPage() {
     resumeReadyTracked.current = ready;
   }
 
+  function saveBaseResume() {
+    const text = resumeText.trim();
+    if (text.length < 80) return;
+    const next: StoredBaseResume = { text, savedAt: new Date().toISOString() };
+    try {
+      window.localStorage.setItem(BASE_RESUME_KEY, JSON.stringify(next));
+      setBaseResume(next);
+      trackEvent('base_resume_saved', { action: baseResume ? 'updated' : 'created' });
+    } catch {
+      // Keep the current workflow usable if browser storage is unavailable.
+    }
+  }
+
+  function clearBaseResume() {
+    try { window.localStorage.removeItem(BASE_RESUME_KEY); } catch { /* Ignore storage errors. */ }
+    setBaseResume(null);
+    trackEvent('base_resume_cleared');
+  }
+
+  function useSavedBaseResume() {
+    if (!baseResume) return;
+    setResumeMode('paste');
+    setResumeFile(null);
+    setResumeName('');
+    setResumeNeedsReview(false);
+    setResumeState('ready');
+    setResumeError('');
+    changeResumeText(baseResume.text);
+    trackEvent('base_resume_loaded');
+  }
+
   function changeParsedJd(value: string) {
     setJdText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBaseline(''); setReviewBlocks([]); setFactConfirmations({}); setConfirmedDraft(''); setConfirmedAt('');
     const ready = value.trim().length >= 80;
@@ -660,6 +716,7 @@ export default function NewMatchPage() {
   const incompleteReviewBlocks = reviewPreviewBlocks.filter(isBlankReviewBlock).length;
   const reviewReady = reviewDraft.trim().length >= 80 && incompleteReviewBlocks === 0;
   const exportReady = reviewReady && factReviewReady;
+  const baseResumeMatches = Boolean(baseResume && resumeText.trim() && compactComparableText(baseResume.text) === compactComparableText(resumeText));
   const factCategoryCopy: Record<FactChangeCategory, string> = {
     identity: t.factIdentity,
     headline: t.factHeadline,
@@ -989,6 +1046,13 @@ export default function NewMatchPage() {
           <div className="materials-grid">
             <article className="material-card">
               <header><div><h2>{t.resumeTitle}</h2><p>{t.resumeBody}</p></div><span className={resumeReady ? 'material-check is-ready' : 'material-check'}>{resumeReady ? '✓' : '-'}</span></header>
+              {baseResume && <div className="base-resume-tools" aria-label={t.baseResumeSaved}>
+                <div><b>{t.baseResumeSaved}</b><small>{t.baseResumeHint}</small></div>
+                <div className="base-resume-actions">
+                  <button type="button" onClick={useSavedBaseResume}>{t.useBaseResume}</button>
+                  <button type="button" className="base-resume-clear" onClick={clearBaseResume}>{t.clearBaseResume}</button>
+                </div>
+              </div>}
               <div className="material-tabs" role="group" aria-label={t.resumeTitle}>
                 <button type="button" className={resumeMode === 'upload' ? 'is-active' : ''} onClick={() => setResumeMode('upload')}>{t.upload}</button>
                 <button type="button" className={resumeMode === 'paste' ? 'is-active' : ''} onClick={() => setResumeMode('paste')}>{t.paste}</button>
@@ -1006,6 +1070,7 @@ export default function NewMatchPage() {
                   {resumeText && <details className="parsed-review" open={resumeNeedsReview}><summary>{resumeFile ? t.reviewResume : t.restoredResume}<span>{resumeText.length.toLocaleString()} {t.characters}</span></summary><textarea value={resumeText} rows={12} onChange={(event) => changeResumeText(event.target.value)} /></details>}
                 </>
               ) : <label className="material-textarea"><textarea value={resumeText} rows={15} placeholder={t.resumePlaceholder} onChange={(event) => changeResumeText(event.target.value)} /><small>{resumeText.length.toLocaleString()} {t.characters}</small></label>}
+              {resumeReady && !baseResumeMatches && <button type="button" className="base-resume-save" onClick={saveBaseResume}>{baseResume ? t.updateBaseResume : t.saveBaseResume}<span aria-hidden="true">＋</span></button>}
             </article>
 
             <article className="material-card">

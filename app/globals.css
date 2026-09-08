@@ -686,6 +686,17 @@ a { color: inherit; text-decoration: none; }
 .material-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; min-height: 80px; }
 .material-card h2 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.04em; }
 .material-card header p { margin: 9px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.base-resume-tools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; padding: 12px 14px; border: 1px solid #d8e1ee; background: #f7f9fc; }
+.base-resume-tools > div:first-child { min-width: 0; display: grid; gap: 3px; }
+.base-resume-tools b { color: var(--ink); font-size: 12px; font-weight: 650; }
+.base-resume-tools small { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.base-resume-actions { display: flex; align-items: center; flex: 0 0 auto; gap: 8px; }
+.base-resume-actions button, .base-resume-save { min-height: 32px; padding: 0 11px; border: 1px solid #b7c9e9; background: white; color: var(--cobalt); font-size: 11px; font-weight: 620; cursor: pointer; }
+.base-resume-actions button:hover, .base-resume-save:hover { border-color: var(--cobalt); background: #f2f6ff; }
+.base-resume-actions .base-resume-clear { border-color: transparent; background: transparent; color: var(--muted); font-weight: 500; }
+.base-resume-actions .base-resume-clear:hover { border-color: #d8dee8; background: white; color: var(--ink); }
+.base-resume-save { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
+.base-resume-save span { font-size: 15px; line-height: 1; }
 .material-check { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--muted); font-size: 11px; }
 .material-check.is-ready { border-color: #21875b; background: #21875b; color: white; }
 .material-tabs { display: inline-grid; grid-template-columns: 1fr 1fr; margin-top: 22px; border: 1px solid var(--line-strong); }
@@ -1323,6 +1334,9 @@ a { color: inherit; text-decoration: none; }
   .material-status { display: grid; grid-template-columns: 1fr 1fr; }
   .demo-material-button { justify-content: space-between; }
   .material-card { padding: 18px; }
+  .base-resume-tools { align-items: flex-start; flex-direction: column; }
+  .base-resume-actions { width: 100%; }
+  .base-resume-actions button { flex: 1; }
   .compact-upload { grid-template-columns: auto minmax(0, 1fr); min-height: 140px; padding: 16px; }
   .compact-upload em { grid-column: 2; }
   .workspace-action { position: static; align-items: stretch; flex-direction: column; }
