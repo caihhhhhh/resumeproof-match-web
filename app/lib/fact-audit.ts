@@ -1,6 +1,6 @@
 import type { ReviewBlock } from '../components/resume-document';
 
-export type FactChangeCategory = 'identity' | 'headline' | 'contact' | 'experience' | 'date' | 'number' | 'proper_noun';
+export type FactChangeCategory = 'identity' | 'headline' | 'contact' | 'experience' | 'date' | 'number' | 'proper_noun' | 'claim';
 
 export type FactChange = {
   id: string;
@@ -9,7 +9,7 @@ export type FactChange = {
 };
 
 function normalized(value: string) {
-  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+  return value.replace(/[|｜]/g, ' ').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function additions(baseline: Iterable<string>, current: Iterable<string>) {
@@ -60,5 +60,19 @@ export function auditFactChanges(baselineText: string, currentText: string, base
   add('number', additions(relevantNumbers(baselineText), relevantNumbers(currentText)));
   add('proper_noun', additions(technicalTerms(baselineText), technicalTerms(currentText)));
 
-  return changes.slice(0, 40);
+  // Compare the complete metric-bearing statement, not a document-wide number set.
+  const statements = (value: string) => value.split(/[\r\n。！？;；]+/).map((part) => part.trim()).filter(Boolean);
+  const previous = statements(baselineText);
+  for (const statement of statements(currentText)) {
+    if (previous.some((line) => normalized(line) === normalized(statement))) continue;
+    if (/\d/.test(statement)) add('number', [statement]);
+    else if (/主导|牵头|负责|达成|实现|提升|增长|减少|降低|保障|确保|lead|own|achiev|improv|increas|reduc|deliver/i.test(statement)) {
+      add('claim', [statement]);
+    }
+  }
+
+  // One confirmation per changed statement; avoid repeating its individual numbers.
+  return changes.filter((change) => !changes.some((other) => other !== change
+    && other.value.includes(change.value)
+    && (other.value.length > change.value.length || (other.category === 'experience' && change.category !== 'experience'))));
 }

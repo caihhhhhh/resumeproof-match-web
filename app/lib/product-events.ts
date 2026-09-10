@@ -3,6 +3,7 @@ import { productEventsNameIndex, productEventsSchema, productEventsTimeIndex } f
 
 export const PRODUCT_EVENT_NAMES = new Set([
   'page_view', 'match_started',
+  'base_resume_saved', 'base_resume_loaded', 'base_resume_cleared',
   'resume_upload_started', 'resume_upload_completed', 'resume_upload_failed', 'resume_input_ready',
   'jd_link_parse_started', 'jd_link_parse_completed', 'jd_link_parse_failed',
   'jd_file_upload_started', 'jd_file_upload_completed', 'jd_file_upload_failed', 'jd_input_ready',
@@ -14,6 +15,7 @@ export const PRODUCT_EVENT_NAMES = new Set([
 ]);
 
 const PROPERTY_KEYS = new Set([
+  'action', 'match_id', 'is_demo',
   'source', 'file_type', 'file_size', 'extraction', 'reason', 'method',
   'resume_method', 'jd_method', 'language', 'grade', 'score_band',
   'decision', 'hard_gate_count', 'unverified_gate_count', 'unmet_gate_count',

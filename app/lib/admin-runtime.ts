@@ -260,9 +260,10 @@ function stringProperty(row: ProductEventRow, key: string) {
 }
 
 function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: number): ProductAnalyticsSnapshot {
-  const current = rows.filter((row) => row.occurred_at_ms >= now - windowMs);
-  const count = (eventName: string, predicate?: (row: ProductEventRow) => boolean) => current
-    .filter((row) => row.event_name === eventName && (!predicate || predicate(row))).length;
+  const current = rows.filter((row) => row.occurred_at_ms >= now - windowMs && productProperties(row).is_demo !== true);
+  const count = (eventName: string, predicate?: (row: ProductEventRow) => boolean) => new Set(current
+    .filter((row) => row.event_name === eventName && (!predicate || predicate(row)))
+    .map((row) => stringProperty(row, 'journey_id')).filter(Boolean)).size;
   const workspaceViews = count('page_view', (row) => row.page_path === '/match/new');
   const analysisStarts = count('analysis_started');
   const analysisCompleted = count('analysis_completed');
@@ -270,7 +271,6 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
   const exports = count('resume_exported');
   const suggestionReviews = current.filter((row) => row.event_name === 'suggestion_reviewed');
   const acceptedSuggestions = suggestionReviews.filter((row) => productProperties(row).decision === 'accepted').length;
-  const analysisAttempts = analysisCompleted + analysisFailures;
   const journeyRows = current.filter((row) => stringProperty(row, 'journey_id'));
   const journeyIds = new Set(journeyRows.map((row) => stringProperty(row, 'journey_id')));
   const unattributedPageViews = current.filter((row) => row.event_name === 'page_view' && !stringProperty(row, 'journey_id')).length;
@@ -317,10 +317,10 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
 
   return {
     kpis: [
-      { label: '匹配页访问', value: String(workspaceViews), note: '页面访问事件' },
-      { label: '发起分析', value: String(analysisStarts), note: '点击分析事件' },
+      { label: '匹配页访问', value: String(workspaceViews), note: '按访问旅程去重' },
+      { label: '发起分析', value: String(analysisStarts), note: '按访问旅程去重' },
       { label: '分析完成', value: String(analysisCompleted), note: '完整结果返回' },
-      { label: '导出动作', value: String(exports), note: 'HTML 与打印合计' },
+      { label: '导出简历', value: String(exports), note: 'PDF、DOCX、HTML 去重' },
     ],
     steps: [
       { key: 'workspace', label: '进入匹配页', count: workspaceViews },
@@ -332,7 +332,7 @@ function buildProductSnapshot(rows: ProductEventRow[], now: number, windowMs: nu
       { key: 'export', label: '导出简历', count: exports },
     ],
     quality: {
-      analysisSuccessRate: percent(analysisCompleted, analysisAttempts),
+      analysisSuccessRate: percent(current.filter((row) => row.event_name === 'analysis_completed').length, current.filter((row) => row.event_name === 'analysis_completed' || row.event_name === 'analysis_failed').length),
       suggestionAcceptanceRate: percent(acceptedSuggestions, suggestionReviews.length),
       analysisFailures,
     },

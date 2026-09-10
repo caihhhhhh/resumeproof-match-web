@@ -45,6 +45,7 @@ export type OptimizationSuggestion = {
 };
 
 export type MatchAnalysis = {
+  suggestionStatus?: 'ready' | 'unavailable';
   mode: 'ai';
   summary: string;
   overall: number;
@@ -75,15 +76,14 @@ export function isMatchAnalysis(value: unknown): value is MatchAnalysis {
       && Array.isArray(item.resumeEvidence)
       && typeof item.rationale === 'string' && item.rationale.trim())
     && Boolean(scoring) && typeof scoring?.verifiedEvidence === 'number'
-    && typeof scoring?.totalRequirements === 'number' && scoring.totalRequirements >= 3
+    && typeof scoring?.totalRequirements === 'number' && scoring.totalRequirements >= 1
     && typeof scoring?.strongCount === 'number' && typeof scoring?.partialCount === 'number' && typeof scoring?.gapCount === 'number'
-    && Array.isArray(analysis.coveredTerms) && analysis.coveredTerms.some((item) => typeof item === 'string' && item.trim())
-    && Array.isArray(analysis.missingTerms) && analysis.missingTerms.some((item) => typeof item === 'string' && item.trim())
-    && Array.isArray(analysis.evidence) && analysis.evidence.length >= 3
+    && Array.isArray(analysis.coveredTerms) && analysis.coveredTerms.every((item) => typeof item === 'string')
+    && Array.isArray(analysis.missingTerms) && analysis.missingTerms.every((item) => typeof item === 'string')
+    && Array.isArray(analysis.evidence) && analysis.evidence.length >= 1
     && analysis.evidence.every((item) => typeof item.requirement === 'string' && item.requirement.trim()
       && typeof item.rationale === 'string' && item.rationale.trim() && Array.isArray(item.resumeEvidence)
       && ['strong', 'partial', 'gap'].includes(item.status))
-    && analysis.evidence.some((item) => item.resumeEvidence.length > 0)
     && Array.isArray(analysis.suggestions)
     && analysis.suggestions.every((item) => typeof item.originalText === 'string' && item.originalText.trim()
       && typeof item.sourceStart === 'number' && Number.isInteger(item.sourceStart) && item.sourceStart >= 0

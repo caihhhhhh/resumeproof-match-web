@@ -10,7 +10,7 @@ import {
   View,
 } from '@react-pdf/renderer';
 import type { ReviewBlock, ResumeTemplate } from '../components/resume-document';
-import { splitResumeEntry } from '../components/resume-document';
+import { resumeEntry } from '../components/resume-document';
 
 const CJK_FONT_FAMILY = 'ResumeProof Noto Sans SC';
 const CJK_FONT_URL = 'https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@Sans2.004/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf';
@@ -59,6 +59,7 @@ const shared = {
 };
 
 const compact = {
+  ...shared,
   page: { ...shared.page, paddingTop: 36.9, paddingRight: 45.4, paddingBottom: 31.2, paddingLeft: 45.4, fontSize: 9.5, lineHeight: 1.46 },
   name: { ...shared.name, fontSize: 21 },
   headline: { ...shared.headline, fontSize: 10.5 },
@@ -104,7 +105,7 @@ function ResumePdfDocument({ blocks, template, language }: { blocks: ReviewBlock
           if (block.kind === 'contact') return <Text key={key} style={styles.contact}>{text}</Text>;
           if (block.kind === 'section') return <Text key={key} style={styles.section} minPresenceAhead={42}>{text.replace(/[:：]$/, '')}</Text>;
           if (block.kind === 'entry') {
-            const entry = splitResumeEntry(text);
+            const entry = resumeEntry(block);
             return <View key={key} style={styles.entry} minPresenceAhead={28}><Text style={styles.entryTitle}>{entry.title}</Text>{entry.date && <Text style={styles.entryDate}>{entry.date}</Text>}</View>;
           }
           if (block.kind === 'bullet') {

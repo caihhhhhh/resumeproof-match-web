@@ -27,14 +27,14 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
     accepted: '已采用', pending: '待处理', skipped: '已跳过', original: '简历原文', proposal: '建议版本', reason: '原文问题与调整逻辑', impact: '预期作用', requirement: '对应 JD',
     adopt: '直接采用', edit: '修改后采用', confirmEdit: '确认采用修改版', skip: '跳过', factRequired: '这条涉及新增事实，不能直接采用。请先按真实情况修改。',
     section: '建议位置', back: '返回修改材料', next: '进入完整文字审核稿', ready: '建议已处理，可以审核完整文字稿。',
-    needMore: '请先处理全部建议；可以采用、修改后采用或跳过。', empty: 'AI 没有找到值得改写且能由原文支持的内容。无需为了匹配而硬改。',
+    needMore: '仅合并你已采用的建议，其他内容保留原文。', empty: '没有需要改写的内容，可以直接审核原文。',
   } : {
     eyebrow: 'AI rewrite suggestions', title: 'Change only what is worth changing.',
     body: 'Every suggestion keeps the source, proposed version, and rationale. The system will not force rewrites when the evidence does not support them.',
     accepted: 'Adopted', pending: 'Pending', skipped: 'Skipped', original: 'Original resume text', proposal: 'Suggested version', reason: 'Source issue and revision logic', impact: 'Expected impact', requirement: 'Related JD requirement',
     adopt: 'Adopt', edit: 'Edit and adopt', confirmEdit: 'Adopt edited version', skip: 'Skip', factRequired: 'This change needs an additional fact. Edit it to reflect the truth before adopting.',
     section: 'Suggested location', back: 'Back to materials', next: 'Open the full text draft', ready: 'Suggestions reviewed. The full draft is ready.',
-    needMore: 'Review every suggestion. You may adopt, edit, or skip each one.', empty: 'AI found no worthwhile rewrite that could be supported by the source text. Do not force a change for matching.',
+    needMore: 'Only adopted edits are merged. All other text stays as written.', empty: 'No rewrite is needed. Continue with your original text.',
   };
 
   function adopt(id: string, revisedText: string) {
@@ -82,12 +82,12 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
             </article>
           );
         })}
-      </div> : <p className="empty-suggestions">{text.empty}</p>}
+      </div> : <p className="empty-suggestions">{analysis.suggestionStatus === 'unavailable' ? (language === 'zh' ? '匹配报告已完成，改写服务本次未完成。你可以先审核原文，或返回重新分析。' : 'The match report is ready, but rewrites were unavailable. Review the original text or retry analysis.') : text.empty}</p>}
 
       {suggestions.length > 0 && <p className={`review-state${reviewComplete ? ' is-ready' : ''}`}>{reviewComplete ? text.ready : text.needMore}</p>}
       <div className="review-actions">
         <button type="button" className="review-back" onClick={onBack}><span aria-hidden="true">←</span>{text.back}</button>
-        <button type="button" disabled={!reviewComplete} title={reviewComplete ? text.next : text.needMore} onClick={onBuildDraft}>{text.next}<span aria-hidden="true">→</span></button>
+        <button type="button" title={reviewComplete ? text.next : text.needMore} onClick={onBuildDraft}>{text.next}<span aria-hidden="true">→</span></button>
       </div>
     </div>
   );

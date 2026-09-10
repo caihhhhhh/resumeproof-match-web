@@ -75,7 +75,7 @@ export async function saveConsentedSample(input: {
       `).bind(
         publicId, now, now + RETENTION_MS, input.language,
         redactMaterial(input.resumeText), redactMaterial(input.jdText),
-        input.score, input.grade, input.summary.slice(0, 1_000),
+        input.score, input.grade, redactMaterial(input.summary).slice(0, 1_000),
       ),
     ]);
     return publicId;

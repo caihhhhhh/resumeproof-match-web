@@ -39,7 +39,7 @@ function groupBlocks(blocks: ReviewBlock[], headerTitle: string): Group[] {
 function entryCards(group: Group, blocks: ReviewBlock[]): EntryCard[] {
   const cards: EntryCard[] = [];
   for (const index of group.indices) {
-    if (blocks[index].kind === 'entry') cards.push({ entryIndex: index, contentIndices: [] });
+    if (blocks[index].kind === 'entry' || !cards.length) cards.push({ entryIndex: index, contentIndices: [] });
     else cards.at(-1)?.contentIndices.push(index);
   }
   return cards;
@@ -59,6 +59,11 @@ function parseEntryFields(value: string) {
 
 function buildEntryText(organization: string, role: string, date: string) {
   return [organization.trim(), role.trim()].filter(Boolean).join(' | ') + (date.trim() ? ` ${date.trim()}` : '');
+}
+
+function withEntryField(block: ReviewBlock, field: 'organization' | 'role' | 'date', value: string): ReviewBlock {
+  const fields = { ...(block.fields ?? parseEntryFields(block.text)), [field]: value };
+  return { ...block, kind: 'entry', fields, text: buildEntryText(fields.organization, fields.role, fields.date) };
 }
 
 export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange, rawValue, canUndo, canRedo, onUndo, onRedo }: Props) {
@@ -124,9 +129,7 @@ export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange
     onChange([...blocks.slice(0, first.start), ...blocks.slice(second.start, second.end), ...blocks.slice(first.start, first.end), ...blocks.slice(second.end)], 'checkpoint');
   }
   function updateEntry(index: number, field: 'organization' | 'role' | 'date', value: string) {
-    const fields = parseEntryFields(blocks[index].text);
-    fields[field] = value;
-    update(index, buildEntryText(fields.organization, fields.role, fields.date));
+    onChange(blocks.map((block, blockIndex) => blockIndex === index ? withEntryField(block, field, value) : block), 'merge');
   }
   function sectionRange(group: Group) {
     const start = group.headingIndex!;
@@ -165,13 +168,13 @@ export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange
     {groups.map((group, groupIndex) => {
       const isEntryGroup = group.headingIndex !== null && (ENTRY_SECTION.test(group.title) || group.indices.some((index) => blocks[index].kind === 'entry'));
       const cards = isEntryGroup ? entryCards(group, blocks) : [];
-      return <details className="resume-editor-group" key={`${group.title}-${groupIndex}`} open={groupIndex < 3}>
+      return <details className="resume-editor-group" key={groupIndex} open={groupIndex < 3}>
         <summary><span>{group.title}</span><small>{isEntryGroup ? cards.length : group.indices.length}</small></summary>
         <div className="resume-editor-fields">
           {group.headingIndex !== null && <><label className="resume-editor-section-name"><span>{fieldLabel('section', language)}</span><input value={blocks[group.headingIndex].text.replace(/[:：]$/, '')} onChange={(event) => update(group.headingIndex!, event.target.value)} /></label><div className="resume-editor-section-actions"><button type="button" disabled={sectionGroups[0]?.headingIndex === group.headingIndex} onClick={() => moveSection(group, -1)}>↑ {t.up}</button><button type="button" disabled={sectionGroups.at(-1)?.headingIndex === group.headingIndex} onClick={() => moveSection(group, 1)}>↓ {t.down}</button><button type="button" className="is-danger" onClick={() => deleteSection(group)}>{t.removeSection}</button></div></>}
           {isEntryGroup ? <>
             {cards.length ? cards.map((card, cardIndex) => {
-              const fields = parseEntryFields(blocks[card.entryIndex].text);
+              const fields = blocks[card.entryIndex].fields ?? parseEntryFields(blocks[card.entryIndex].text);
               const organizationLabel = EDUCATION_SECTION.test(group.title) ? t.school : PROJECT_SECTION.test(group.title) ? t.project : t.company;
               const roleLabel = EDUCATION_SECTION.test(group.title) ? t.degree : PROJECT_SECTION.test(group.title) ? t.projectRole : t.role;
               return <article className="experience-editor-card" key={`${card.entryIndex}-${cardIndex}`}>

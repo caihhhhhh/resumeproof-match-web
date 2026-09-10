@@ -268,7 +268,7 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
 
         <section id="product-funnel" className="admin-grid-row admin-product-row">
           <article className="admin-panel admin-product-panel">
-            <div className="admin-panel-head"><div><h2>产品使用漏斗</h2><p>覆盖所有访客的无正文事件次数；重复操作会重复计数，不等同于独立用户。</p></div><span className="admin-live"><i /> LIVE DATA</span></div>
+            <div className="admin-panel-head"><div><h2>产品阶段覆盖</h2><p>按访问旅程去重，排除已标记的示例操作和无旅程标识的历史记录；不是严格顺序漏斗或独立用户数。最多读取最近 10,000 条事件。</p></div><span className="admin-live"><i /> LIVE DATA</span></div>
             <div className="admin-product-kpis">
               {productSnapshot.kpis.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.note}</small></div>)}
             </div>

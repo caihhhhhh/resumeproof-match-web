@@ -11,6 +11,23 @@ type Acquisition = {
 
 const ACQUISITION_KEY = 'resumeproof-acquisition-v1';
 let volatileAcquisition: Acquisition | null = null;
+let matchContext: { match_id: string; is_demo: boolean } | null = null;
+
+export function beginMatch(isDemo = false) {
+  matchContext = { match_id: newJourneyId(), is_demo: isDemo };
+  try { window.sessionStorage.setItem('resumeproof-match-event-v1', JSON.stringify(matchContext)); } catch { /* In-memory context remains available. */ }
+}
+
+function currentMatch() {
+  if (!matchContext) {
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem('resumeproof-match-event-v1') || 'null');
+      if (saved && typeof saved.match_id === 'string' && typeof saved.is_demo === 'boolean') matchContext = saved;
+    } catch { /* Storage is optional. */ }
+    if (!matchContext) beginMatch();
+  }
+  return matchContext!;
+}
 
 function newJourneyId() {
   return typeof crypto.randomUUID === 'function'
@@ -72,7 +89,7 @@ function acquisition(): Acquisition {
 
 export function trackEvent(name: string, parameters: Record<string, AnalyticsValue> = {}) {
   if (typeof window === 'undefined') return;
-  const eventParameters = { ...acquisition(), ...parameters };
+  const eventParameters = { ...acquisition(), ...currentMatch(), ...parameters };
   void fetch('/api/analytics/event', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

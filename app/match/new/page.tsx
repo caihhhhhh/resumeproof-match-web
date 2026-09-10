@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { OptimizationReview, SuggestionDecision } from '../../components/optimization-review';
-import { ResumeDocument, ResumeTemplate, ReviewBlock, splitResumeEntry } from '../../components/resume-document';
+import { ResumeDocument, ResumeTemplate, ReviewBlock, resumeEntry } from '../../components/resume-document';
 import { ResumeStructuredEditor } from '../../components/resume-structured-editor';
 import { SiteFooter } from '../../components/site-footer';
 import { useLanguage } from '../../components/language-context';
@@ -11,7 +11,7 @@ import { getDemoMaterials } from '../../lib/demo-materials';
 import { auditFactChanges, FactChangeCategory } from '../../lib/fact-audit';
 import { EvidenceStatus, HardRequirementStatus, isMatchAnalysis, MatchAnalysis } from '../../lib/match-analysis';
 import { identifyJobSource, sourceLabels } from '../../lib/job-source';
-import { fileSizeBucket, trackEvent } from '../../lib/analytics';
+import { beginMatch, fileSizeBucket, trackEvent } from '../../lib/analytics';
 
 type Screen = 'materials' | 'results' | 'review';
 type InputMode = 'upload' | 'paste';
@@ -58,7 +58,7 @@ type StoredBaseResume = {
 
 const copy = {
   zh: {
-    back: '返回首页', workspaceTitle: '先把两份材料放在一起。', workspaceBody: '文件优先在浏览器读取，并仅在当前标签页临时保留；开始分析后，简历与 JD 文字会发送至 AI 服务，扫描文件会使用视觉识别服务。',
+    back: '返回首页', workspaceTitle: '添加简历与目标岗位', workspaceBody: '上传简历，再添加目标岗位。分析时会将文字发送至 AI 服务；扫描文件需要视觉识别。',
     resumeReady: '简历已就绪', resumeWaiting: '等待简历', jdReady: 'JD 已就绪', jdWaiting: '等待 JD', localOnly: 'AI 语义分析',
     resumeTitle: '基础简历', resumeBody: '上传文件，或直接粘贴简历文字。可选保存一份本机基础版本。', upload: '上传文件', paste: '粘贴文字', chooseFile: '选择一份简历文件',
     fileHint: '最大 8 MB · PDF、DOCX、TXT、MD、PNG、JPG 或 WebP', reading: '正在读取并识别内容…', uploaded: '上传成功', parsed: '内容已读取，请先核对文字再开始匹配',
@@ -71,21 +71,21 @@ const copy = {
     invalidUrl: '请输入有效的 HTTPS 招聘链接。', reviewJd: '查看或编辑读取到的 JD 文字', characters: '字符', start: '开始 AI 分析', confirmAndAnalyze: '确认识别文字并分析', analyzing: 'AI 正在分析…', startHint: '点击后，已核对的简历与 JD 文字将发送给 DeepSeek 做语义分析；图片或扫描 PDF 仅在识别时发送给智谱。', sampleConsent: '允许保存自动脱敏后的简历与 JD 30 天，用于改进匹配质量（可选）', samplePrivacy: '了解数据处理', sampleSaved: '脱敏样本已保存 30 天', sampleDelete: '立即删除', sampleDeleted: '样本已删除',
     aiNotConfigured: '分析服务尚未配置，请联系网站管理员。', aiFailed: '分析服务暂时不可用，请稍后重试。', aiAuth: '分析服务授权异常，请联系网站管理员。', aiBalance: '分析服务额度不足，请联系网站管理员。', aiRate: '分析服务请求过于频繁，请稍后重试。', siteRate: '当前设备请求较频繁，请稍后再试。', aiOutput: '完整报告未生成成功，请重新分析。系统不会展示缺少评分、证据或建议的半成品。', aiTimeout: '分析超过 60 秒仍未响应，请重新分析。',
     resultBack: '返回修改材料', matchTitle: '证据先于分数。', matchBody: 'AI 会识别同义表达和可迁移经验，但每项匹配都必须引用真实的简历原句。结果不代表招聘决定。',
-    decisionLabel: '投递建议', decisionApply: '可以直接投递', decisionReview: '确认后再投递', decisionSkip: '暂不建议投递', decisionApplyNote: '硬条件已核对，核心能力有充分证据。', decisionReviewNote: '存在尚未确认的硬条件或需要补强的核心证据。', decisionSkipNote: '存在明确硬条件冲突或关键能力证据不足。', scoreLabel: '证据匹配度', gradeA: '值得投递', gradeB: '有条件投递', gradeC: '证据不足', scoreMethod: '系统先核对硬条件，再按 3、2、1 权重计算必须项、重要项和加分项；分数只作为辅助，不会覆盖未确认或不满足的硬条件。', mustCoverage: '必须项覆盖', importantCoverage: '重要项覆盖', bonusCoverage: '加分项覆盖', verifiedCoverage: '原句核验率', mustNote: '对最终判断影响最大', importantNote: '影响岗位胜任度', bonusNote: '不满足通常不构成淘汰', verifiedNote: '匹配项中可核对简历原句的比例',
+    decisionLabel: '投递建议', decisionApply: '可以直接投递', decisionReview: '确认后再投递', decisionSkip: '暂不建议投递', decisionApplyNote: '硬条件已核对，核心能力有充分证据。', decisionReviewNote: '存在尚未确认的硬条件或需要补强的核心证据。', decisionSkipNote: '存在明确硬条件冲突或关键能力证据不足。', scoreLabel: '证据匹配度', gradeA: '值得投递', gradeB: '有条件投递', gradeC: '证据不足', scoreMethod: '系统先核对硬条件，再按 3、2、1 权重计算必须项、重要项和加分项；分数只作为辅助，不会覆盖未确认或不满足的硬条件。', mustCoverage: '必须项覆盖', importantCoverage: '重要项覆盖', bonusCoverage: '加分项覆盖', verifiedCoverage: '引用覆盖率', mustNote: '对最终判断影响最大', importantNote: '影响岗位胜任度', bonusNote: '不满足通常不构成淘汰', verifiedNote: '分析要求中附有原句的比例，不代表语义核验通过率',
     hardTitle: '先核对硬条件', hardBody: '地点、身份、学历、年限、语言和行业门槛不会被综合分数掩盖。', hardEmpty: 'JD 中没有识别到明确的硬性门槛。', hardMet: '已满足', hardUnverified: '待确认', hardNotMet: '不满足', hardEvidence: '核对原句',
-    factTitle: '导出前核对事实变化', factBody: '这里只检查相对原始简历和已采用建议新增或修改的敏感事实，普通措辞调整不会被拦截。', factClear: '没有发现新增的敏感事实，可以继续导出。', factProgress: '项已确认', factConfirm: '我确认这项内容真实且准确', factIdentity: '姓名', factHeadline: '目标方向', factContact: '联系方式', factExperience: '公司、职位或经历时间', factDate: '日期', factNumber: '数字或指标', factProperNoun: '平台或专有名词', factBlocked: '请先确认全部事实变化，再导出文件。',
+    factTitle: '导出前核对事实变化', factBody: '对照原始简历，核对新增或改写的数字、职责与成果。已采用的 AI 建议也需要核对；这些提示不代表内容一定有误。', factClear: '自动检查未标记事实变化，请核对全文后导出。', factProgress: '项已确认', factConfirm: '我确认这项内容真实且准确', factIdentity: '姓名', factHeadline: '目标方向', factContact: '联系方式', factExperience: '公司、职位或经历时间', factDate: '日期', factNumber: '数字或指标', factProperNoun: '平台或专有名词', factBlocked: '请先确认全部事实变化，再导出文件。',
     evidenceTitle: 'JD 要求与简历证据', evidenceBody: '先看原句，再看简历中是否有语义对应且可核对的证据。', nextFocusTitle: '先处理这些关键差距', nextFocusEmpty: '当前没有高优先级证据缺口，可以直接审核改写建议。',
     statusStrong: '已证实', statusPartial: '部分证据', statusGap: '尚无证据', noMatchedTerms: '暂无可核对原句', coveredTitle: '已有优势', missingTitle: '优先补证',
     missingAdvice: '只补充真实做过的项目、动作或结果；没有经历就保留为差距。', metricSignals: '份量化结果已识别', localRules: 'AI 语义诊断 · 原句证据校验', evidenceQuote: '简历证据', whyMatch: '判断依据',
     feedbackTitle: '这份分析对你有帮助吗？', feedbackBody: '只记录选择，不记录简历或 JD 内容。', feedbackYes: '有帮助', feedbackNo: '不太准', feedbackWhy: '主要问题是', feedbackThanks: '收到，感谢你的反馈。', feedbackError: '暂时无法提交，请稍后再试。', feedbackScore: '评分不合理', feedbackEvidence: '漏掉已有经历', feedbackSuggestions: '建议不实用', feedbackUnclear: '解释不清楚', feedbackOther: '其他',
-    reviewEyebrow: '完整文字审核稿', reviewTitle: '审核、选版式、导出，一页完成。', reviewBody: '这里只合并你明确采用的建议。核对全文并选择版式后，可直接确认并保存 PDF 或 DOCX。', reviewChanges: '本轮已采用修改', reviewOriginal: '原文', reviewFinal: '审核稿', reviewCharacters: '字符', reviewWarning: '导出前请重点核对公司、职位、日期、数字和专有名词。', reviewBack: '返回建议审核', reviewNext: '确认文字稿', reviewPreview: '排版预览', reviewEdit: '编辑文字', reviewPreviewHint: '预览只调整视觉层级与空白，不改变审核稿内容。', reviewNoChanges: '本轮没有采用 AI 改写，当前显示原始简历全文。', reviewCanvas: '文字排版预览', reviewPage: '页', reviewPagesApprox: '预计', reviewIncomplete: '项待填写', reviewLong: '内容可能超过两页，建议切换紧凑版或精简次要信息。',
+    reviewEyebrow: '完整文字审核稿', reviewTitle: '编辑与导出', reviewBody: '这里只合并你明确采用的建议。核对全文并选择版式后，可直接确认并保存 PDF 或 DOCX。', reviewChanges: '本轮已采用修改', reviewOriginal: '原文', reviewFinal: '审核稿', reviewCharacters: '字符', reviewWarning: '导出前请重点核对公司、职位、日期、数字和专有名词。', reviewBack: '返回建议审核', reviewNext: '确认文字稿', reviewPreview: '排版预览', reviewEdit: '编辑文字', reviewPreviewHint: '预览只调整视觉层级与空白，不改变审核稿内容。', reviewNoChanges: '本轮没有采用 AI 改写，当前显示原始简历全文。', reviewCanvas: '文字排版预览', reviewPage: '页', reviewPagesApprox: '预计', reviewIncomplete: '项待填写', reviewLong: '内容可能超过两页，建议切换紧凑版或精简次要信息。',
     confirmedEyebrow: '文字审核已完成', confirmedTitle: '这份文字稿已锁定。', confirmedBody: '系统保存了当前全文快照。返回修改任何文字后，本次确认会自动失效；此操作不会生成 HTML、PDF 或其他文件。', confirmedSnapshot: '已确认全文', confirmedChanges: '采用修改', confirmedTime: '确认时间', confirmedEdit: '返回继续编辑', confirmedNext: '选择简历模板', confirmedNextHint: '先选择版式，不会立即生成文件。',
-    templateEyebrow: '选择版式', templateTitle: '内容不变，只调整阅读节奏。', templateBody: '三个模板共用已确认文字。切换模板不会重写内容，也不会影响匹配报告。', templateBalanced: 'GTM 经典单栏', templateBalancedBody: '沿用 Will 的简历骨架：蓝灰标题、清晰时间轴与舒适行距。', templateCompact: 'GTM 紧凑单栏', templateCompactBody: '保持同一视觉体系，压缩段间距以容纳更长经历。', templateMinimal: 'GTM 极简单栏', templateMinimalBody: '保留版式节奏，降低色彩强调，让成果更突出。', templateSelected: '已选择', templateBack: '返回确认记录', templateContinue: '进入最终预览',
-    exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '下载稳定 PDF', exportDocx: '下载 DOCX', exportMore: '更多格式', exportAnother: '用当前简历匹配新岗位', exportPrintHint: 'PDF 将直接生成 A4 文件，正文可选择并内嵌中文字体；DOCX 可继续在 Word 中编辑。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成', pdfCheckTitle: 'PDF 与 ATS 基础检查', pdfCheckBody: 'A4 单栏、固定页边距、可选择文字、受控分页；中文简历按需嵌入字体。', pdfGenerating: '正在生成 PDF…', pdfError: 'PDF 生成失败，请检查网络后重试，或先下载 DOCX。',
+    templateEyebrow: '选择版式', templateTitle: '内容不变，只调整阅读节奏。', templateBody: '三个模板共用已确认文字。切换模板不会重写内容，也不会影响匹配报告。', templateBalanced: '经典单栏', templateBalancedBody: '沿用 Will 的简历骨架：蓝灰标题、清晰时间轴与舒适行距。', templateCompact: '紧凑单栏', templateCompactBody: '保持同一视觉体系，压缩段间距以容纳更长经历。', templateMinimal: '极简单栏', templateMinimalBody: '保留版式节奏，降低色彩强调，让成果更突出。', templateSelected: '已选择', templateBack: '返回确认记录', templateContinue: '进入最终预览',
+    exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '确认并下载 PDF', exportDocx: '下载 DOCX', exportMore: '更多格式', exportAnother: '用当前简历匹配新岗位', exportPrintHint: '确认全文后下载。PDF 为实际 A4 分页；网页页数仅供参考，DOCX 可继续编辑。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成', pdfCheckTitle: '导出格式说明', pdfCheckBody: 'A4 单栏、固定页边距、可选择文字、受控分页；中文简历按需嵌入字体。', pdfGenerating: '正在生成 PDF…', pdfError: 'PDF 生成失败，请检查网络后重试，或先下载 DOCX。',
     demoAction: '使用示例材料完整体验', demoLoaded: '示例材料与完整报告已载入', saveBaseResume: '保存为本机基础简历', updateBaseResume: '更新本机基础简历', useBaseResume: '使用已保存版本', baseResumeSaved: '本机基础版本已保存', clearBaseResume: '清除本机版本', baseResumeHint: '只保存在这台设备的浏览器中，不会上传；清除浏览器数据后会消失。',
   },
   en: {
-    back: 'Back home', workspaceTitle: 'Put both sources in one place.', workspaceBody: 'Files are read in your browser and kept only for this tab. Resume and JD text is sent to the AI service after you start analysis; scanned files use visual recognition.',
+    back: 'Back home', workspaceTitle: 'Add your resume and target role', workspaceBody: 'Add your resume and target role. Analysis sends the text to an AI service; scanned files use visual recognition.',
     resumeReady: 'Resume ready', resumeWaiting: 'Resume needed', jdReady: 'JD ready', jdWaiting: 'JD needed', localOnly: 'AI semantic analysis',
     resumeTitle: 'Base resume', resumeBody: 'Upload a file or paste the complete resume. You can optionally keep one local base version.', upload: 'Upload file', paste: 'Paste text', chooseFile: 'Choose a resume file',
     fileHint: 'Up to 8 MB · PDF, DOCX, TXT, MD, PNG, JPG, or WebP', reading: 'Reading and recognizing content…', uploaded: 'Upload successful', parsed: 'Content extracted. Review the text before matching.',
@@ -98,17 +98,17 @@ const copy = {
     invalidUrl: 'Enter a valid HTTPS job posting URL.', reviewJd: 'Review or edit the extracted JD text', characters: 'characters', start: 'Start AI analysis', confirmAndAnalyze: 'Confirm extracted text and analyze', analyzing: 'AI is analyzing…', startHint: 'After you click, reviewed resume and JD text is sent to DeepSeek for semantic analysis. Images or scanned PDFs are sent to Zhipu only for recognition.', sampleConsent: 'Save an automatically redacted resume and JD for 30 days to improve matching (optional)', samplePrivacy: 'How data is handled', sampleSaved: 'Redacted sample saved for 30 days', sampleDelete: 'Delete now', sampleDeleted: 'Sample deleted',
     aiNotConfigured: 'The analysis service is not configured. Contact the site administrator.', aiFailed: 'The analysis service is temporarily unavailable. Please try again.', aiAuth: 'The analysis service has an authorization issue. Contact the site administrator.', aiBalance: 'The analysis service has insufficient quota. Contact the site administrator.', aiRate: 'The analysis service is rate-limiting requests. Try again shortly.', siteRate: 'This device has made too many requests. Please try again shortly.', aiOutput: 'The complete report could not be generated. Please retry; incomplete scores, evidence, or suggestions will never be shown.', aiTimeout: 'Analysis did not finish within 60 seconds. Please run it again.',
     resultBack: 'Back to materials', matchTitle: 'Evidence before scores.', matchBody: 'AI can recognize equivalent wording and transferable experience, but every match must cite a real resume excerpt. Results are not hiring decisions.',
-    decisionLabel: 'Application recommendation', decisionApply: 'Apply now', decisionReview: 'Confirm before applying', decisionSkip: 'Do not apply yet', decisionApplyNote: 'Eligibility gates are verified and core capabilities have strong evidence.', decisionReviewNote: 'An eligibility gate is still unverified or a core capability needs stronger evidence.', decisionSkipNote: 'There is an explicit eligibility conflict or a critical evidence gap.', scoreLabel: 'Evidence match', gradeA: 'Pursue', gradeB: 'Conditional fit', gradeC: 'Evidence gap', scoreMethod: 'Eligibility gates are checked first. Must-have, important, and bonus capabilities then use 3:2:1 weights; the score cannot override an unverified or unmet gate.', mustCoverage: 'Must-have coverage', importantCoverage: 'Important coverage', bonusCoverage: 'Bonus coverage', verifiedCoverage: 'Source verification', mustNote: 'Largest impact on the final score', importantNote: 'Material to role readiness', bonusNote: 'Usually not disqualifying', verifiedNote: 'Share of mappings backed by exact resume excerpts',
+    decisionLabel: 'Application recommendation', decisionApply: 'Apply now', decisionReview: 'Confirm before applying', decisionSkip: 'Do not apply yet', decisionApplyNote: 'Eligibility gates are verified and core capabilities have strong evidence.', decisionReviewNote: 'An eligibility gate is still unverified or a core capability needs stronger evidence.', decisionSkipNote: 'There is an explicit eligibility conflict or a critical evidence gap.', scoreLabel: 'Evidence match', gradeA: 'Pursue', gradeB: 'Conditional fit', gradeC: 'Evidence gap', scoreMethod: 'Eligibility gates are checked first. Must-have, important, and bonus capabilities then use 3:2:1 weights; the score cannot override an unverified or unmet gate.', mustCoverage: 'Must-have coverage', importantCoverage: 'Important coverage', bonusCoverage: 'Bonus coverage', verifiedCoverage: 'Citation coverage', mustNote: 'Largest impact on the final score', importantNote: 'Material to role readiness', bonusNote: 'Usually not disqualifying', verifiedNote: 'Share of requirements with source excerpts; not a semantic accuracy score',
     hardTitle: 'Verify eligibility gates first', hardBody: 'Location, authorization, education, experience, language, and industry gates cannot be hidden by an overall score.', hardEmpty: 'No explicit eligibility gate was found in this JD.', hardMet: 'Verified', hardUnverified: 'Confirm', hardNotMet: 'Not met', hardEvidence: 'Source evidence',
-    factTitle: 'Verify factual changes before export', factBody: 'This checks sensitive facts added or changed after the source resume and accepted suggestions. Ordinary wording edits are not blocked.', factClear: 'No new sensitive facts were detected. This draft can be exported.', factProgress: 'confirmed', factConfirm: 'I confirm this information is true and accurate', factIdentity: 'Name', factHeadline: 'Target direction', factContact: 'Contact information', factExperience: 'Company, title, or experience dates', factDate: 'Date', factNumber: 'Number or metric', factProperNoun: 'Platform or proper noun', factBlocked: 'Confirm every factual change before exporting.',
+    factTitle: 'Verify factual changes before export', factBody: 'Compare changed metrics, responsibilities and outcomes with your original resume, including accepted AI suggestions. A flag means a check is needed, not that the statement is false.', factClear: 'No factual changes were flagged automatically. Review the full text before exporting.', factProgress: 'confirmed', factConfirm: 'I confirm this information is true and accurate', factIdentity: 'Name', factHeadline: 'Target direction', factContact: 'Contact information', factExperience: 'Company, title, or experience dates', factDate: 'Date', factNumber: 'Number or metric', factProperNoun: 'Platform or proper noun', factBlocked: 'Confirm every factual change before exporting.',
     evidenceTitle: 'JD requirements and resume evidence', evidenceBody: 'Start from each requirement, then verify whether the resume contains semantically relevant source evidence.', nextFocusTitle: 'Fix these evidence gaps first', nextFocusEmpty: 'No high-priority evidence gap was found. You can review the rewrite suggestions next.',
     statusStrong: 'Supported', statusPartial: 'Partial evidence', statusGap: 'No evidence yet', noMatchedTerms: 'No verified excerpt yet', coveredTitle: 'Current strengths', missingTitle: 'Evidence to add first',
     missingAdvice: 'Add only projects, actions, or outcomes you actually have. If the experience does not exist, keep it as a gap.', metricSignals: 'quantified results detected', localRules: 'AI semantic diagnostic · source evidence verified', evidenceQuote: 'Resume evidence', whyMatch: 'Reasoning',
     feedbackTitle: 'Was this analysis useful?', feedbackBody: 'Only your selection is stored. Resume and JD content are not included.', feedbackYes: 'Useful', feedbackNo: 'Not accurate', feedbackWhy: 'Main issue', feedbackThanks: 'Thanks, your feedback was received.', feedbackError: 'Feedback could not be submitted. Try again later.', feedbackScore: 'Score feels wrong', feedbackEvidence: 'Missed existing evidence', feedbackSuggestions: 'Suggestions are weak', feedbackUnclear: 'Explanation is unclear', feedbackOther: 'Other',
-    reviewEyebrow: 'Full text review', reviewTitle: 'Review, choose a layout, and export on one page.', reviewBody: 'Only suggestions you explicitly adopted are merged here. Verify the full draft, choose a layout, then confirm and save PDF or DOCX.', reviewChanges: 'Adopted changes', reviewOriginal: 'Original', reviewFinal: 'Review draft', reviewCharacters: 'characters', reviewWarning: 'Before export, verify company names, titles, dates, metrics, and proper nouns.', reviewBack: 'Back to suggestions', reviewNext: 'Confirm draft', reviewPreview: 'Layout preview', reviewEdit: 'Edit text', reviewPreviewHint: 'The preview changes hierarchy and spacing only. Draft content stays unchanged.', reviewNoChanges: 'No AI rewrite was adopted. The original resume is shown in full.', reviewCanvas: 'Text layout preview', reviewPage: 'page', reviewPagesApprox: 'About', reviewIncomplete: 'fields to complete', reviewLong: 'This may run beyond two pages. Try the compact layout or trim lower-priority details.',
+    reviewEyebrow: 'Full text review', reviewTitle: 'Edit and export', reviewBody: 'Only suggestions you explicitly adopted are merged here. Verify the full draft, choose a layout, then confirm and save PDF or DOCX.', reviewChanges: 'Adopted changes', reviewOriginal: 'Original', reviewFinal: 'Review draft', reviewCharacters: 'characters', reviewWarning: 'Before export, verify company names, titles, dates, metrics, and proper nouns.', reviewBack: 'Back to suggestions', reviewNext: 'Confirm draft', reviewPreview: 'Layout preview', reviewEdit: 'Edit text', reviewPreviewHint: 'The preview changes hierarchy and spacing only. Draft content stays unchanged.', reviewNoChanges: 'No AI rewrite was adopted. The original resume is shown in full.', reviewCanvas: 'Text layout preview', reviewPage: 'page', reviewPagesApprox: 'About', reviewIncomplete: 'fields to complete', reviewLong: 'This may run beyond two pages. Try the compact layout or trim lower-priority details.',
     confirmedEyebrow: 'Text review complete', confirmedTitle: 'This draft is now locked.', confirmedBody: 'The complete text snapshot has been saved. Editing any text will invalidate this confirmation. No HTML, PDF, or other file is created here.', confirmedSnapshot: 'Confirmed text', confirmedChanges: 'adopted changes', confirmedTime: 'Confirmed at', confirmedEdit: 'Return to edit', confirmedNext: 'Choose a template', confirmedNextHint: 'Choose the layout first. No file is generated yet.',
-    templateEyebrow: 'Choose a layout', templateTitle: 'Keep the content. Change the reading rhythm.', templateBody: 'All three templates use the confirmed text. Switching layouts does not rewrite the resume or change the match report.', templateBalanced: 'GTM classic', templateBalancedBody: "Will's resume structure with blue-grey hierarchy, a clear timeline, and comfortable spacing.", templateCompact: 'GTM compact', templateCompactBody: 'The same visual system with tighter spacing for longer experience.', templateMinimal: 'GTM minimal', templateMinimalBody: 'The same reading rhythm with quieter color and more focus on outcomes.', templateSelected: 'Selected', templateBack: 'Back to confirmation', templateContinue: 'Open final preview',
-    exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Download stable PDF', exportDocx: 'Download DOCX', exportMore: 'More formats', exportAnother: 'Match this resume to another job', exportPrintHint: 'PDF is generated directly as A4 with selectable text and embedded CJK fonts when needed. DOCX remains editable in Word.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready', pdfCheckTitle: 'PDF and ATS baseline', pdfCheckBody: 'A4 single column, fixed margins, selectable text, and controlled pagination. CJK fonts load only when needed.', pdfGenerating: 'Generating PDF…', pdfError: 'PDF generation failed. Check your connection and retry, or download DOCX.',
+    templateEyebrow: 'Choose a layout', templateTitle: 'Keep the content. Change the reading rhythm.', templateBody: 'All three templates use the confirmed text. Switching layouts does not rewrite the resume or change the match report.', templateBalanced: 'Classic', templateBalancedBody: "Will's resume structure with blue-grey hierarchy, a clear timeline, and comfortable spacing.", templateCompact: 'Compact', templateCompactBody: 'The same visual system with tighter spacing for longer experience.', templateMinimal: 'Minimal', templateMinimalBody: 'The same reading rhythm with quieter color and more focus on outcomes.', templateSelected: 'Selected', templateBack: 'Back to confirmation', templateContinue: 'Open final preview',
+    exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Confirm and download PDF', exportDocx: 'Download DOCX', exportMore: 'More formats', exportAnother: 'Match this resume to another job', exportPrintHint: 'Confirm the full text before downloading. PDF uses A4 pagination; web page counts are approximate. DOCX is editable.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready', pdfCheckTitle: 'Export format', pdfCheckBody: 'A4 single column, fixed margins, selectable text, and controlled pagination. CJK fonts load only when needed.', pdfGenerating: 'Generating PDF…', pdfError: 'PDF generation failed. Check your connection and retry, or download DOCX.',
     demoAction: 'Try the complete example', demoLoaded: 'Example materials and full report loaded', saveBaseResume: 'Save as local base resume', updateBaseResume: 'Update local base resume', useBaseResume: 'Use saved version', baseResumeSaved: 'Local base version saved', clearBaseResume: 'Clear local version', baseResumeHint: 'Stored only in this browser on this device. It is not uploaded and disappears if browser data is cleared.',
   },
 } as const;
@@ -188,7 +188,7 @@ function sameReviewBlocks(left: ReviewBlock[], right: ReviewBlock[]) {
 
 function isReviewBlockArray(value: unknown): value is ReviewBlock[] {
   const kinds = new Set(['name', 'headline', 'contact', 'section', 'entry', 'bullet', 'body']);
-  return Array.isArray(value) && value.every((item) => item && typeof item === 'object' && kinds.has(String((item as ReviewBlock).kind)) && typeof (item as ReviewBlock).text === 'string');
+  return Array.isArray(value) && value.every((item) => item && typeof item === 'object' && kinds.has(String((item as ReviewBlock).kind)) && typeof (item as ReviewBlock).text === 'string' && (!item.fields || ['organization', 'role', 'date'].every((key) => typeof item.fields[key] === 'string')));
 }
 
 function escapeHtml(value: string) {
@@ -203,7 +203,7 @@ function standaloneResumeHtml(blocks: ReviewBlock[], template: ResumeTemplate, l
     if (block.kind === 'name') return `<h1>${text}</h1>`;
     if (block.kind === 'section') return `<h2>${text}</h2>`;
     if (block.kind === 'entry') {
-      const entry = splitResumeEntry(block.text);
+      const entry = resumeEntry(block);
       return `<div class="resume-entry"><h3>${escapeHtml(entry.title)}</h3>${entry.date ? `<span>${escapeHtml(entry.date)}</span>` : ''}</div>`;
     }
     return `<p class="resume-${block.kind}">${text}</p>`;
@@ -246,32 +246,35 @@ p { margin: 0 0 2.8mm; }
 </html>`;
 }
 
-async function resumeDocxBlob(blocks: ReviewBlock[], language: 'zh' | 'en') {
+async function resumeDocxBlob(blocks: ReviewBlock[], language: 'zh' | 'en', template: ResumeTemplate) {
   const {
     AlignmentType, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun,
   } = await import('docx');
   const font = language === 'zh' ? 'Microsoft YaHei' : 'Arial';
+  const accent = template === 'minimal' ? '18212B' : '315F78';
+  const line = template === 'compact' ? 270 : 310;
+  const bodySize = template === 'compact' ? 19 : 20;
   const children = blocks.flatMap((block) => {
     const text = block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '').trim();
     if (!text) return [];
     if (block.kind === 'name') return [new Paragraph({ heading: HeadingLevel.TITLE, spacing: { after: 55 }, children: [new TextRun({ text, bold: true, font, size: 46, color: '18212B' })] })];
-    if (block.kind === 'headline') return [new Paragraph({ spacing: { after: 55 }, children: [new TextRun({ text, bold: true, font, size: 23, color: '315F78' })] })];
-    if (block.kind === 'contact') return [new Paragraph({ spacing: { after: 190 }, border: { bottom: { color: '315F78', size: 12, style: 'single' } }, children: [new TextRun({ text, font, size: 19, color: '66717D' })] })];
-    if (block.kind === 'section') return [new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { before: 260, after: 105 }, children: [new TextRun({ text: text.replace(/[:：]$/, ''), bold: true, font, size: 24, color: '315F78' })] })];
+    if (block.kind === 'headline') return [new Paragraph({ spacing: { after: 55 }, children: [new TextRun({ text, bold: true, font, size: 23, color: accent })] })];
+    if (block.kind === 'contact') return [new Paragraph({ spacing: { after: 190 }, border: { bottom: { color: accent, size: 12, style: 'single' } }, children: [new TextRun({ text, font, size: bodySize, color: '66717D' })] })];
+    if (block.kind === 'section') return [new Paragraph({ heading: HeadingLevel.HEADING_1, keepNext: true, spacing: { before: 260, after: 105 }, children: [new TextRun({ text: text.replace(/[:：]$/, ''), bold: true, font, size: 24, color: accent })] })];
     if (block.kind === 'entry') {
-      const entry = splitResumeEntry(block.text);
+      const entry = resumeEntry(block);
       return [new Paragraph({
-        spacing: { before: 100, after: 55 },
-        tabStops: [{ type: TabStopType.RIGHT, position: 9_000 }],
+        keepNext: true, spacing: { before: 100, after: 55 },
+        tabStops: [{ type: TabStopType.RIGHT, position: template === 'compact' ? 10_092 : 9_978 }],
         children: [new TextRun({ text: entry.title, bold: true, font, size: 21, color: '18212B' }), ...(entry.date ? [new TextRun({ text: `\t${entry.date}`, font, size: 18, color: '66717D' })] : [])],
       })];
     }
-    if (block.kind === 'bullet') return [new Paragraph({ bullet: { level: 0 }, spacing: { after: 45, line: 300 }, children: [new TextRun({ text, font, size: 19 })] })];
-    return [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 65, line: 300 }, children: [new TextRun({ text, font, size: 19 })] })];
+    if (block.kind === 'bullet') return [new Paragraph({ bullet: { level: 0 }, spacing: { after: 45, line }, children: [new TextRun({ text, font, size: bodySize })] })];
+    return [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 65, line }, children: [new TextRun({ text, font, size: bodySize })] })];
   });
   const document = new Document({
-    styles: { default: { document: { run: { font, size: 19 }, paragraph: { spacing: { line: 300 } } } } },
-    sections: [{ properties: { page: { margin: { top: 850, right: 964, bottom: 794, left: 964 } } }, children }],
+    styles: { default: { document: { run: { font, size: bodySize }, paragraph: { spacing: { line } } } } },
+    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: template === 'compact' ? { top: 737, right: 907, bottom: 624, left: 907 } : { top: 850, right: 964, bottom: 794, left: 964 } } }, children }],
   });
   return Packer.toBlob(document);
 }
@@ -402,6 +405,8 @@ export default function NewMatchPage() {
   const [feedbackState, setFeedbackState] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
   const [pdfExportState, setPdfExportState] = useState<'idle' | 'working' | 'error'>('idle');
   const [previewPages, setPreviewPages] = useState(1);
+  const [reviewView, setReviewView] = useState<'edit' | 'preview'>('edit');
+  const [baseMessage, setBaseMessage] = useState('');
   const resumeReadyTracked = useRef(false);
   const jdReadyTracked = useRef(false);
   const reviewUndoRef = useRef<ReviewBlock[][]>([]);
@@ -464,7 +469,7 @@ export default function NewMatchPage() {
             if (typeof draft.reviewDraft === 'string') {
               setReviewDraft(draft.reviewDraft);
               setReviewBlocks(isReviewBlockArray(draft.reviewBlocks) ? draft.reviewBlocks : parseReviewBlocks(draft.reviewDraft));
-              setReviewBaseline(typeof draft.reviewBaseline === 'string' && draft.reviewBaseline.length >= 80 ? draft.reviewBaseline : draft.reviewDraft);
+              setReviewBaseline(savedResumeText);
               if (draft.factConfirmations && typeof draft.factConfirmations === 'object') setFactConfirmations(draft.factConfirmations);
             }
             if (typeof draft.confirmedDraft === 'string') setConfirmedDraft(draft.confirmedDraft);
@@ -495,6 +500,7 @@ export default function NewMatchPage() {
     const paper = previewMeasureRef.current?.querySelector<HTMLElement>('.resume-paper');
     if (!paper) return;
     const measure = () => {
+      if (!paper.clientWidth) return;
       const pageHeight = Math.max(1, paper.clientWidth * (297 / 210));
       setPreviewPages(Math.max(1, Math.ceil(paper.scrollHeight / pageHeight - 0.15)));
     };
@@ -512,6 +518,7 @@ export default function NewMatchPage() {
   }, [analysisState]);
 
   const activateDemo = useCallback(() => {
+    beginMatch(true);
     const demo = getDemoMaterials(language);
     setResumeMode('paste'); setResumeFile(null); setResumeName(''); setResumeText(demo.resume); setResumeNeedsReview(false); setResumeState('ready'); setResumeError('');
     setJdFile(null); setJdFileName(''); setJdEntry(demo.jd); setJdText(demo.jd); setJdSource(language === 'zh' ? '公开脱敏示例' : 'Public demo'); setJdState('ready'); setJdMessage('');
@@ -635,15 +642,17 @@ export default function NewMatchPage() {
     try {
       window.localStorage.setItem(BASE_RESUME_KEY, JSON.stringify(next));
       setBaseResume(next);
+      setBaseMessage(language === 'zh' ? '已保存在当前浏览器，可下次继续使用。' : 'Saved in this browser for your next visit.');
       trackEvent('base_resume_saved', { action: baseResume ? 'updated' : 'created' });
     } catch {
-      // Keep the current workflow usable if browser storage is unavailable.
+      setBaseMessage(language === 'zh' ? '保存失败，请检查浏览器存储设置。当前文字仍在页面中。' : 'Could not save. Check browser storage settings; your current text is still here.');
     }
   }
 
   function clearBaseResume() {
-    try { window.localStorage.removeItem(BASE_RESUME_KEY); } catch { /* Ignore storage errors. */ }
+    try { window.localStorage.removeItem(BASE_RESUME_KEY); } catch { setBaseMessage(language === 'zh' ? '未能清除，请检查浏览器存储设置。' : 'Could not clear browser storage.'); return; }
     setBaseResume(null);
+    setBaseMessage(language === 'zh' ? '本机基础版本已清除，当前编辑内容保留。' : 'Local base version cleared. Current edits are retained.');
     trackEvent('base_resume_cleared');
   }
 
@@ -725,6 +734,7 @@ export default function NewMatchPage() {
     date: t.factDate,
     number: t.factNumber,
     proper_noun: t.factProperNoun,
+    claim: language === 'zh' ? '成果或职责变化' : 'Changed outcome or responsibility',
   };
   const templateOptions: Array<{ id: ResumeTemplate; name: string; description: string }> = [
     { id: 'balanced', name: t.templateBalanced, description: t.templateBalancedBody },
@@ -760,7 +770,7 @@ export default function NewMatchPage() {
     let merged = resumeText;
     for (const item of replacements) merged = `${merged.slice(0, item.start)}${item.revised}${merged.slice(item.end)}`;
     setReviewDraft(merged);
-    setReviewBaseline(merged);
+    setReviewBaseline(resumeText);
     setReviewBlocks(parseReviewBlocks(merged));
     setFactConfirmations({});
     reviewUndoRef.current = [];
@@ -800,7 +810,7 @@ export default function NewMatchPage() {
   }
 
   function applyReviewBlocks(value: ReviewBlock[], mode: 'merge' | 'checkpoint' = 'merge', draft = serializeReviewBlocks(value)) {
-    if (sameReviewBlocks(value, reviewBlocks)) return;
+    if (sameReviewBlocks(value, reviewBlocks) && JSON.stringify(value) === JSON.stringify(reviewBlocks)) return;
     const now = Date.now();
     const shouldCheckpoint = mode === 'checkpoint' || now - reviewMergeAtRef.current > 750 || reviewUndoRef.current.length === 0;
     if (shouldCheckpoint && reviewBlocks.length) {
@@ -871,7 +881,7 @@ export default function NewMatchPage() {
   async function downloadResumeDocx() {
     if (!confirmDraftForExport()) return;
     trackEvent('resume_export_started', { format: 'docx', template: selectedTemplate });
-    const blob = await resumeDocxBlob(reviewPreviewBlocks, language);
+    const blob = await resumeDocxBlob(reviewPreviewBlocks, language, selectedTemplate);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -908,6 +918,7 @@ export default function NewMatchPage() {
   }
 
   function startAnotherMatch() {
+    beginMatch();
     const nextResume = confirmedDraft || reviewDraft || resumeText;
     setResumeMode('paste');
     setResumeFile(null);
@@ -946,6 +957,7 @@ export default function NewMatchPage() {
 
   async function runAiAnalysis() {
     if (!resumeReady || !jdReady || analysisState === 'working') return;
+    beginMatch();
     setAnalysisSeconds(0); setAnalysisState('working'); setAnalysisError(''); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBaseline(''); setReviewBlocks([]); setFactConfirmations({}); setConfirmedDraft(''); setConfirmedAt('');
     trackEvent('analysis_started', { resume_method: resumeMode, jd_method: jdFile ? 'file' : looksLikeUrl ? 'url' : 'paste', language });
     const controller = new AbortController();
@@ -1067,10 +1079,12 @@ export default function NewMatchPage() {
                   </label>
                   {resumeError && <p className="inline-error" role="alert">{resumeError}</p>}
                   {resumeState === 'ready' && <p className={resumeReady ? 'inline-note is-success' : 'inline-note'}>{resumeReady ? t.parsed : t.pendingOcr}</p>}
-                  {resumeText && <details className="parsed-review" open={resumeNeedsReview}><summary>{resumeFile ? t.reviewResume : t.restoredResume}<span>{resumeText.length.toLocaleString()} {t.characters}</span></summary><textarea value={resumeText} rows={12} onChange={(event) => changeResumeText(event.target.value)} /></details>}
+                  {resumeText && <details className="parsed-review" open={resumeNeedsReview}><summary>{resumeFile ? t.reviewResume : t.restoredResume}<span>{resumeText.length.toLocaleString()} {t.characters}</span></summary><textarea aria-label={t.resumeTitle} value={resumeText} rows={12} onChange={(event) => changeResumeText(event.target.value)} /></details>}
                 </>
-              ) : <label className="material-textarea"><textarea value={resumeText} rows={15} placeholder={t.resumePlaceholder} onChange={(event) => changeResumeText(event.target.value)} /><small>{resumeText.length.toLocaleString()} {t.characters}</small></label>}
+              ) : <label className="material-textarea"><textarea aria-label={t.resumeTitle} value={resumeText} rows={15} placeholder={t.resumePlaceholder} onChange={(event) => changeResumeText(event.target.value)} /><small>{resumeText.length.toLocaleString()} {t.characters}</small></label>}
               {resumeReady && !baseResumeMatches && <button type="button" className="base-resume-save" onClick={saveBaseResume}>{baseResume ? t.updateBaseResume : t.saveBaseResume}<span aria-hidden="true">＋</span></button>}
+              {resumeReady && !baseResume && <p className="local-save-hint">{t.baseResumeHint}</p>}
+              {baseMessage && <p className="inline-note" role="status">{baseMessage}</p>}
             </article>
 
             <article className="material-card">
@@ -1081,11 +1095,11 @@ export default function NewMatchPage() {
                 <span><b>{jdState === 'working' ? t.jdReading : jdFile ? jdFileName : t.jdUpload}</b><small>{jdFile ? `${(jdFile.size / 1024 / 1024).toFixed(2)} MB` : t.jdUploadHint}</small></span>
               </label>
               <div className="material-or"><span>{language === 'zh' ? '或粘贴' : 'or paste'}</span></div>
-              <label className="universal-jd"><textarea value={jdEntry} rows={11} placeholder={t.jdPlaceholder} onChange={(event) => handleJdEntry(event.target.value)} />{!looksLikeUrl && <small>{jdEntry.length.toLocaleString()} {t.characters}</small>}</label>
+              <label className="universal-jd"><textarea aria-label={t.jdTitle} value={jdEntry} rows={11} placeholder={t.jdPlaceholder} onChange={(event) => handleJdEntry(event.target.value)} />{!looksLikeUrl && <small>{jdEntry.length.toLocaleString()} {t.characters}</small>}</label>
               {looksLikeUrl && <button type="button" className="parse-link-button" disabled={jdState === 'working'} onClick={parseJobLink}>{jdState === 'working' ? t.parsingLink : t.parseLink}<span aria-hidden="true">→</span></button>}
               {jdSource && <p className="source-detected"><span>{t.detected}</span><b>{jdSource}</b></p>}
               {jdMessage && <p className={jdState === 'error' ? 'inline-error' : 'inline-note'} role="status">{jdMessage}</p>}
-              {looksLikeUrl && jdText && <details className="parsed-review"><summary>{t.reviewJd}<span>{jdText.length.toLocaleString()} {t.characters}</span></summary><textarea value={jdText} rows={12} onChange={(event) => changeParsedJd(event.target.value)} /></details>}
+              {looksLikeUrl && jdText && <details className="parsed-review"><summary>{t.reviewJd}<span>{jdText.length.toLocaleString()} {t.characters}</span></summary><textarea aria-label={t.jdTitle} value={jdText} rows={12} onChange={(event) => changeParsedJd(event.target.value)} /></details>}
               {jobTitle && <p className="job-summary">{[jobTitle, jobCompany, jobLocation].filter(Boolean).join(' · ')}</p>}
             </article>
           </div>
@@ -1150,7 +1164,8 @@ export default function NewMatchPage() {
               </div>
             ) : <p className="fact-audit-clear"><span aria-hidden="true">✓</span>{t.factClear}</p>}
           </section>
-          <div className="text-review-grid">
+          <div className="review-view-switch" role="group" aria-label={t.reviewCanvas}><button type="button" aria-pressed={reviewView === 'edit'} onClick={() => setReviewView('edit')}>{t.reviewEdit}</button><button type="button" aria-pressed={reviewView === 'preview'} onClick={() => setReviewView('preview')}>{t.reviewPreview}</button></div>
+          <div className={`text-review-grid view-${reviewView}`}>
             <section className="review-editor-column" aria-label={t.reviewEdit}>
               <details className="adopted-change-list"><summary><strong>{t.reviewChanges}</strong><span>{adoptedSuggestions.length}</span></summary><div>{adoptedSuggestions.length ? adoptedSuggestions.map((suggestion, index) => <details key={suggestion.id}><summary><span>{String(index + 1).padStart(2, '0')}</span>{suggestion.targetSection}</summary><div><small>{t.reviewOriginal}</small><p>{suggestion.originalText}</p><small>{t.reviewFinal}</small><p>{suggestionNotes[suggestion.id] ?? suggestion.revisedText}</p></div></details>) : <p className="adopted-change-empty">{t.reviewNoChanges}</p>}</div></details>
               <ResumeStructuredEditor blocks={reviewPreviewBlocks} language={language} onChange={editReviewBlocks} rawValue={reviewDraft} onRawChange={editReviewDraft} canUndo={canUndoReview} canRedo={canRedoReview} onUndo={undoReviewEdit} onRedo={redoReviewEdit} />
