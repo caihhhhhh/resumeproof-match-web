@@ -48,7 +48,7 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
   }
 
   return (
-    <div className="optimization-review">
+    <div className="optimization-review" id="rewrite-suggestions" tabIndex={-1}>
       <header className="optimization-heading">
         <div><span>{text.eyebrow}</span><h1>{text.title}</h1><p>{text.body}</p></div>
         {suggestions.length > 0 && <p className="optimization-progress">{pending > 0 ? `${pending} ${text.pending}` : `${accepted} ${text.accepted} · ${skipped} ${text.skipped}`}</p>}

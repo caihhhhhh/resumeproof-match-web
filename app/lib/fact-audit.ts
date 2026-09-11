@@ -12,6 +12,15 @@ function normalized(value: string) {
   return value.replace(/[|｜]/g, ' ').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+function wording(value: string) {
+  // Only equivalent connective wording is ignored. Metrics, subjects, direction,
+  // ownership and negation stay intact and must still match the same statement.
+  return normalized(value).replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '')
+    .replace(/(?:通过|基于)/g, '通过')
+    .replace(/(?:，|,)\s*(?:使|推动)(?=.{0,20}(?:下降|上升|提升|降低|增长))/g, '，使')
+    .replace(/[。.]$/, '');
+}
+
 function additions(baseline: Iterable<string>, current: Iterable<string>) {
   const known = new Set([...baseline].map(normalized));
   return [...current].map((value) => value.trim()).filter((value) => value && !known.has(normalized(value)));
@@ -64,7 +73,7 @@ export function auditFactChanges(baselineText: string, currentText: string, base
   const statements = (value: string) => value.split(/[\r\n。！？;；]+/).map((part) => part.trim()).filter(Boolean);
   const previous = statements(baselineText);
   for (const statement of statements(currentText)) {
-    if (previous.some((line) => normalized(line) === normalized(statement))) continue;
+    if (previous.some((line) => wording(line) === wording(statement))) continue;
     if (/\d/.test(statement)) add('number', [statement]);
     else if (/主导|牵头|负责|达成|实现|提升|增长|减少|降低|保障|确保|lead|own|achiev|improv|increas|reduc|deliver/i.test(statement)) {
       add('claim', [statement]);

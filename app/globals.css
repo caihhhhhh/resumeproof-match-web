@@ -1448,6 +1448,13 @@ a { color: inherit; text-decoration: none; }
   .export-more { flex-basis: 100%; }
   .export-more[open] button { position: static; margin-top: 8px; box-shadow: none; }
 }
+.result-next-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 22px 0; }
+.result-next-actions button { padding: 14px 20px; border: 1px solid var(--ink, #172019); border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.result-next-actions button:first-child { background: #172019; color: #fff; }
+.result-details { border-block: 1px solid #d9ded9; padding: 18px 0; margin-bottom: 16px; }
+.result-details > summary { cursor: pointer; font-weight: 600; }
+.result-details .result-dimensions { margin-top: 20px; }
+#rewrite-suggestions { scroll-margin-top: 90px; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {

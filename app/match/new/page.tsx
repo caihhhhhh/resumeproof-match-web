@@ -1,4 +1,5 @@
 'use client';
+import { mergeReview } from '../../lib/review-merge';
 
 import Link from 'next/link';
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
@@ -42,6 +43,7 @@ type StoredDraft = {
   suggestionNotes?: Record<string, string>;
   reviewDraft?: string;
   reviewBaseline?: string;
+  generatedReview?: string;
   reviewBlocks?: ReviewBlock[];
   factConfirmations?: Record<string, boolean>;
   confirmedDraft?: string;
@@ -391,6 +393,8 @@ export default function NewMatchPage() {
   const [suggestionNotes, setSuggestionNotes] = useState<Record<string, string>>({});
   const [reviewDraft, setReviewDraft] = useState('');
   const [reviewBaseline, setReviewBaseline] = useState('');
+  const [generatedReview, setGeneratedReview] = useState('');
+  const [mergeNotice, setMergeNotice] = useState('');
   const [reviewBlocks, setReviewBlocks] = useState<ReviewBlock[]>([]);
   const [factConfirmations, setFactConfirmations] = useState<Record<string, boolean>>({});
   const [canUndoReview, setCanUndoReview] = useState(false);
@@ -468,6 +472,7 @@ export default function NewMatchPage() {
             if (draft.suggestionNotes && typeof draft.suggestionNotes === 'object') setSuggestionNotes(draft.suggestionNotes);
             if (typeof draft.reviewDraft === 'string') {
               setReviewDraft(draft.reviewDraft);
+              setGeneratedReview(typeof draft.generatedReview === 'string' ? draft.generatedReview : '');
               setReviewBlocks(isReviewBlockArray(draft.reviewBlocks) ? draft.reviewBlocks : parseReviewBlocks(draft.reviewDraft));
               setReviewBaseline(savedResumeText);
               if (draft.factConfirmations && typeof draft.factConfirmations === 'object') setFactConfirmations(draft.factConfirmations);
@@ -491,9 +496,9 @@ export default function NewMatchPage() {
 
   useEffect(() => {
     if (!draftRestored) return;
-    const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, suggestionDecisions, suggestionNotes, reviewDraft, reviewBaseline, reviewBlocks, factConfirmations, confirmedDraft, confirmedAt, selectedTemplate, sampleReference };
+    const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, suggestionDecisions, suggestionNotes, reviewDraft, reviewBaseline, generatedReview, reviewBlocks, factConfirmations, confirmedDraft, confirmedAt, selectedTemplate, sampleReference };
     try { window.sessionStorage.setItem('resumematch-current-draft', JSON.stringify(draft)); } catch { /* Keep the current tab usable if browser storage is unavailable. */ }
-  }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, suggestionDecisions, suggestionNotes, reviewDraft, reviewBaseline, reviewBlocks, factConfirmations, confirmedDraft, confirmedAt, selectedTemplate, sampleReference]);
+  }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, suggestionDecisions, suggestionNotes, reviewDraft, reviewBaseline, generatedReview, reviewBlocks, factConfirmations, confirmedDraft, confirmedAt, selectedTemplate, sampleReference]);
 
   useEffect(() => {
     if (screen !== 'review') return;
@@ -769,6 +774,21 @@ export default function NewMatchPage() {
     }, []).sort((a, b) => b.start - a.start);
     let merged = resumeText;
     for (const item of replacements) merged = `${merged.slice(0, item.start)}${item.revised}${merged.slice(item.end)}`;
+    setMergeNotice('');
+    if (reviewDraft) {
+      const result = generatedReview
+        ? mergeReview(reviewBlocks, parseReviewBlocks(generatedReview), parseReviewBlocks(merged))
+        : { blocks: reviewBlocks, conflicts: 1 };
+      applyReviewBlocks(result.blocks, 'checkpoint');
+      if (result.conflicts) setMergeNotice(language === 'zh'
+        ? '已保留你的手工编辑。部分新建议与现有内容冲突，未自动合并；请在“本轮已采用修改”中对照修改。'
+        : 'Your edits are preserved. Some suggestions conflict with the current draft and were not merged. Compare them in Adopted changes.');
+      else setGeneratedReview(merged);
+      setScreen('review');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setGeneratedReview(merged);
     setReviewDraft(merged);
     setReviewBaseline(resumeText);
     setReviewBlocks(parseReviewBlocks(merged));
@@ -811,6 +831,8 @@ export default function NewMatchPage() {
 
   function applyReviewBlocks(value: ReviewBlock[], mode: 'merge' | 'checkpoint' = 'merge', draft = serializeReviewBlocks(value)) {
     if (sameReviewBlocks(value, reviewBlocks) && JSON.stringify(value) === JSON.stringify(reviewBlocks)) return;
+    // This function runs from edit/navigation event handlers, never during render.
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const shouldCheckpoint = mode === 'checkpoint' || now - reviewMergeAtRef.current > 750 || reviewUndoRef.current.length === 0;
     if (shouldCheckpoint && reviewBlocks.length) {
@@ -1113,19 +1135,20 @@ export default function NewMatchPage() {
       ) : screen === 'results' && analysis ? (
         <section className="match-workbench" aria-labelledby="match-workbench-title">
           <div className="results-toolbar"><button type="button" onClick={() => setScreen('materials')}><span aria-hidden="true">←</span>{t.resultBack}</button><small>{t.localRules}</small></div>
-          <header className="workbench-heading"><div><h1 id="match-workbench-title">{t.matchTitle}</h1><p>{t.matchBody}</p></div></header>
+          <header className="workbench-heading"><div><h1 id="match-workbench-title">{jobTitle || t.matchTitle}</h1><p>{[jobCompany, language === 'zh' ? '先看需要补强的地方，再选择要采用的修改。' : 'Review the gaps, then choose the edits you want to keep.'].filter(Boolean).join(' · ')}</p></div></header>
           {(sampleReference || sampleDeleted) && <div className="sample-receipt"><span>{sampleDeleted ? t.sampleDeleted : `${t.sampleSaved} · ${sampleReference.slice(0, 8)}`}</span>{sampleReference && <button type="button" onClick={deleteSavedSample}>{t.sampleDelete}</button>}</div>}
           <div className="result-decision-grid">
             <article className={`result-verdict decision-${analysis.decision}`}><div className="decision-primary"><span>{t.decisionLabel}</span><strong>{decisionCopy}</strong><b>{decisionNote}</b></div><div className="decision-summary"><blockquote>{analysis.summary}</blockquote><p><span>{t.scoreLabel}</span><b>{analysis.overall}<small>/100</small></b></p></div><small>{t.scoreMethod}</small></article>
             <article className="result-priorities"><h2>{t.nextFocusTitle}</h2>{priorityEvidence.length ? <ol>{priorityEvidence.map((item) => <li key={item.requirement}><span>{item.importance}</span><p>{item.requirement}</p></li>)}</ol> : <p className="priority-empty">{t.nextFocusEmpty}</p>}</article>
           </div>
-          <div className="result-dimensions">{[
+          <div className="result-next-actions"><button type="button" onClick={() => { document.getElementById('rewrite-suggestions')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); document.getElementById('rewrite-suggestions')?.focus({ preventScroll: true }); }}>{language === 'zh' ? '查看具体修改建议' : 'Review suggested edits'} ↓</button><button type="button" onClick={buildTextReview}>{reviewDraft ? (language === 'zh' ? '继续编辑简历' : 'Continue editing') : (language === 'zh' ? '进入简历审核稿' : 'Open resume draft')} →</button></div>
+          <details className="result-details"><summary>{language === 'zh' ? '评分依据与岗位硬性要求' : 'Scoring and eligibility requirements'}</summary><div className="result-dimensions">{[
               { label: t.mustCoverage, value: analysis.scoring.mustCoverage, note: t.mustNote },
               { label: t.importantCoverage, value: analysis.scoring.importantCoverage, note: t.importantNote },
               { label: t.verifiedCoverage, value: analysis.scoring.verifiedEvidence, note: `${t.verifiedNote} · ${analysis.scoring.totalRequirements}` },
             ].map((dimension) => <article key={dimension.label}><header><span>{dimension.label}</span><b>{dimension.value === null ? '-' : `${dimension.value}%`}</b></header><p>{dimension.note}</p></article>)}</div>
           <section className="hard-requirements" aria-labelledby="hard-requirements-title"><header><div><h2 id="hard-requirements-title">{t.hardTitle}</h2><p>{t.hardBody}</p></div><span>{analysis.hardRequirements.length}</span></header>{analysis.hardRequirements.length ? <div>{analysis.hardRequirements.map((item, index) => <article key={`${item.requirement}-${index}`}><div><span className={`hard-status status-${item.status}`}>{hardStatusCopy[item.status]}</span><small>{hardCategoryCopy[item.category]}</small></div><h3>{item.requirement}</h3><p>{item.rationale}</p>{item.resumeEvidence.length > 0 && <blockquote><span>{t.hardEvidence}</span>{item.resumeEvidence.join(' / ')}</blockquote>}</article>)}</div> : <p className="hard-empty">{t.hardEmpty}</p>}</section>
-          <div className="signal-grid"><section><h2>{t.coveredTitle}</h2><div className="term-cloud">{analysis.coveredTerms.map((term) => <span key={term}>{term}</span>)}</div></section><section className="missing-signals"><h2>{t.missingTitle}</h2><div className="term-cloud">{analysis.missingTerms.map((term) => <span key={term}>{term}</span>)}</div><p>{t.missingAdvice}</p></section></div>
+          </details>
           <details className="evidence-section"><summary><div><h2>{t.evidenceTitle}</h2><p>{t.evidenceBody}</p></div><span>{analysis.evidence.length}</span></summary><div className="evidence-list">{analysis.evidence.map((item, index) => <article key={`${item.requirement}-${index}`}><div className="evidence-topline"><span className={`evidence-status status-${item.status}`}>{statusCopy[item.status]}</span><small>{item.importance}</small></div><p className="evidence-requirement">{item.requirement}</p>{item.resumeEvidence.length ? <blockquote><span>{t.evidenceQuote}</span>{item.resumeEvidence.join(' / ')}</blockquote> : <small>{t.noMatchedTerms}</small>}<p className="evidence-rationale"><span>{t.whyMatch}</span>{item.rationale}</p></article>)}</div></details>
           <section className="result-feedback" aria-labelledby="result-feedback-title">
             <div><h2 id="result-feedback-title">{t.feedbackTitle}</h2><p>{t.feedbackBody}</p></div>
@@ -1142,6 +1165,7 @@ export default function NewMatchPage() {
       ) : screen === 'review' && analysis ? (
         <section className="text-review-shell" aria-labelledby="text-review-title">
           <header className="text-review-header"><span>{t.reviewEyebrow}</span><h1 id="text-review-title">{t.reviewTitle}</h1><p>{t.reviewBody}</p></header>
+          {mergeNotice && <p className="review-quality-status is-warning" role="status">{mergeNotice}</p>}
           <div className="review-template-bar">
             <div className="review-template-options" role="radiogroup" aria-label={t.templateEyebrow}>
               {templateOptions.map((option) => <button key={option.id} type="button" role="radio" aria-checked={selectedTemplate === option.id} className={selectedTemplate === option.id ? 'is-selected' : ''} onClick={() => setSelectedTemplate(option.id)}>{option.name}</button>)}
