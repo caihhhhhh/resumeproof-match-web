@@ -3,14 +3,13 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { useLanguage } from './language-context';
 import { SiteFooter } from './site-footer';
 import { trackEvent } from '../lib/analytics';
 import './home-experience.css';
 
-gsap.registerPlugin(useGSAP, ScrollTrigger);
+gsap.registerPlugin(useGSAP);
 
 export default function HomeExperience({ initialLanguage }: { initialLanguage?: 'zh' | 'en' }) {
   const root = useRef<HTMLElement>(null);
@@ -39,17 +38,24 @@ export default function HomeExperience({ initialLanguage }: { initialLanguage?: 
     });
   }, { scope: root, dependencies: [view, language] });
   useGSAP(() => {
-    const mm = gsap.matchMedia();
-    mm.add('(prefers-reduced-motion: no-preference)', () => {
-      gsap.fromTo('.rp-paper-stack', { scale: .76, rotationX: 10, y: 24 }, {
-        scale: 1, rotationX: 0, y: 0, ease: 'none',
-        scrollTrigger: { trigger: root.current?.querySelector('.rp-paper-anchor'), start: 'top 85%', end: 'top 20%', scrub: .35, invalidateOnRefresh: true },
+    let active = true;
+    let dispose: (() => void) | undefined;
+    void import('gsap/ScrollTrigger').then(({ ScrollTrigger }) => {
+      if (!active) return;
+      gsap.registerPlugin(ScrollTrigger);
+      const mm = gsap.matchMedia();
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        gsap.fromTo('.rp-paper-stack', { scale: .76, rotationX: 10, y: 24 }, {
+          scale: 1, rotationX: 0, y: 0, ease: 'none',
+          scrollTrigger: { trigger: root.current?.querySelector('.rp-paper-anchor'), start: 'top 85%', end: 'top 20%', scrub: .35, invalidateOnRefresh: true },
+        });
+        gsap.fromTo('.rp-context', { y: 26, opacity: .55 }, { y: 0, opacity: 1, ease: 'none', scrollTrigger: { trigger: root.current?.querySelector('.rp-stage'), start: 'top 90%', end: 'top 35%', scrub: .5 } });
       });
-      gsap.fromTo('.rp-context', { y: 26, opacity: .55 }, { y: 0, opacity: 1, ease: 'none', scrollTrigger: { trigger: root.current?.querySelector('.rp-stage'), start: 'top 90%', end: 'top 35%', scrub: .5 } });
+      const observer = new ResizeObserver(() => ScrollTrigger.refresh());
+      if (root.current) observer.observe(root.current);
+      dispose = () => { observer.disconnect(); mm.revert(); };
     });
-    const observer = new ResizeObserver(() => ScrollTrigger.refresh());
-    if (root.current) observer.observe(root.current);
-    return () => { observer.disconnect(); mm.revert(); };
+    return () => { active = false; dispose?.(); };
   }, { scope: root });
   const { contextSafe } = useGSAP({ scope: root });
   const tilt = contextSafe((event: React.PointerEvent<HTMLDivElement>) => {
