@@ -34,13 +34,13 @@ export function SiteFooter({ forceLanguage }: { forceLanguage?: 'zh' | 'en' } = 
         <Link href={language === 'zh' ? '/guide' : '/en/guide'}>{t.guide}</Link>
         <Link href="/privacy">{t.privacy}</Link>
         <Link href="/terms">{t.terms}</Link>
-        <button type="button" onClick={openAnalyticsSettings}>{t.analytics}</button>
         <a href={repository} target="_blank" rel="noreferrer">{t.github}</a>
         <a href={`${repository}/issues`} target="_blank" rel="noreferrer">{t.feedback}</a>
       </nav>
       <div className="footer-meta">
         <span>© {new Date().getFullYear()} ResumeProof Match</span>
         <span>{t.disclaimer}</span>
+        <button className="footer-analytics" type="button" onClick={openAnalyticsSettings}>{t.analytics}</button>
         {icpNumber ? <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">{icpNumber}</a> : null}
       </div>
     </footer>
