@@ -4,7 +4,8 @@ import { mergeReview } from '../../lib/review-merge';
 import Link from 'next/link';
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { OptimizationReview, SuggestionDecision } from '../../components/optimization-review';
-import { ResumeDocument, ResumeTemplate, ReviewBlock, resumeEntry } from '../../components/resume-document';
+import { ResumeDocument, ResumeTemplate, ReviewBlock } from '../../components/resume-document';
+import { standaloneResumeHtml, resumeDocxBlob } from '../../lib/resume-export';
 import { ResumeStructuredEditor } from '../../components/resume-structured-editor';
 import { SiteFooter } from '../../components/site-footer';
 import { useLanguage } from '../../components/language-context';
@@ -193,93 +194,7 @@ function isReviewBlockArray(value: unknown): value is ReviewBlock[] {
   return Array.isArray(value) && value.every((item) => item && typeof item === 'object' && kinds.has(String((item as ReviewBlock).kind)) && typeof (item as ReviewBlock).text === 'string' && (!item.fields || ['organization', 'role', 'date'].every((key) => typeof item.fields[key] === 'string')));
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] ?? character));
-}
 
-function standaloneResumeHtml(blocks: ReviewBlock[], template: ResumeTemplate, language: 'zh' | 'en') {
-  const body = blocks.map((block) => {
-    const normalized = block.kind === 'bullet' ? block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '') : block.text;
-    if (!normalized.trim()) return '';
-    const text = escapeHtml(normalized.replace(/[:：]$/, ''));
-    if (block.kind === 'name') return `<h1>${text}</h1>`;
-    if (block.kind === 'section') return `<h2>${text}</h2>`;
-    if (block.kind === 'entry') {
-      const entry = resumeEntry(block);
-      return `<div class="resume-entry"><h3>${escapeHtml(entry.title)}</h3>${entry.date ? `<span>${escapeHtml(entry.date)}</span>` : ''}</div>`;
-    }
-    return `<p class="resume-${block.kind}">${text}</p>`;
-  }).join('\n');
-  return `<!doctype html>
-<html lang="${language === 'zh' ? 'zh-CN' : 'en'}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Resume</title>
-<style>
-@page { size: A4; margin: 0; }
-* { box-sizing: border-box; }
-body { margin: 0; background: #edf0f2; color: #18212b; font-family: Arial, "Microsoft YaHei", "PingFang SC", sans-serif; font-size: 10.4pt; line-height: 1.6; }
-.resume { width: 210mm; min-height: 297mm; margin: 16px auto 30px; padding: 15mm 17mm 14mm; background: #fff; box-shadow: 0 3px 18px rgba(30,42,53,.12); }
-h1 { margin: 0; color: #18212b; font-size: 23pt; line-height: 1.18; letter-spacing: .2px; }
-h1 + .resume-headline { margin-top: 4px; color: #315f78; font-size: 11.3pt; font-weight: 700; letter-spacing: .3px; }
-h2 { margin: 5.5mm 0 3.2mm; color: #315f78; font-size: 12.2pt; line-height: 1.3; letter-spacing: 1.3px; }
-h3 { margin: 4.3mm 0 1.3mm; color: #18212b; font-size: 10.8pt; line-height: 1.4; }
-.resume-entry { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: baseline; gap: 16px; margin: 16px 0 6px; break-after: avoid; break-inside: avoid-page; }
-.resume-entry h3 { margin: 0; }
-.resume-entry span { color: #66717d; font-size: 9.2pt; white-space: nowrap; }
-h2 + h3 { margin-top: 12px; }
-p { margin: 0 0 2.8mm; }
-.resume-contact { margin: 6px 0 0; padding-bottom: 6mm; border-bottom: 1.5px solid #315f78; color: #66717d; font-size: 9.7pt; }
-.resume-bullet { display: grid; grid-template-columns: 5mm minmax(0,1fr); margin-bottom: 1.25mm; line-height: 1.6; }
-.resume-bullet::before { content: "•"; color: #315f78; padding-left: .7mm; }
-.template-compact { padding: 13mm 16mm 11mm; font-size: 9.5pt; line-height: 1.46; }
-.template-compact h2 { margin-top: 4mm; }
-.template-compact .resume-entry { margin: 11px 0 4px; }
-.template-compact p { margin-bottom: 1mm; }
-.template-minimal h2 { color: #18212b; letter-spacing: .7px; }
-.template-minimal .resume-contact { border-color: #9aa4ae; }
-.template-minimal h3 { font-size: 12px; }
-.template-minimal .resume-bullet::before { color: #66717d; }
-@media print { body { background: white; } .resume { margin: 0; box-shadow: none; } }
-</style>
-</head>
-<body><main class="resume template-${template}">${body}</main></body>
-</html>`;
-}
-
-async function resumeDocxBlob(blocks: ReviewBlock[], language: 'zh' | 'en', template: ResumeTemplate) {
-  const {
-    AlignmentType, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun,
-  } = await import('docx');
-  const font = language === 'zh' ? 'Microsoft YaHei' : 'Arial';
-  const accent = template === 'minimal' ? '18212B' : '315F78';
-  const line = template === 'compact' ? 270 : 310;
-  const bodySize = template === 'compact' ? 19 : 20;
-  const children = blocks.flatMap((block) => {
-    const text = block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '').trim();
-    if (!text) return [];
-    if (block.kind === 'name') return [new Paragraph({ heading: HeadingLevel.TITLE, spacing: { after: 55 }, children: [new TextRun({ text, bold: true, font, size: 46, color: '18212B' })] })];
-    if (block.kind === 'headline') return [new Paragraph({ spacing: { after: 55 }, children: [new TextRun({ text, bold: true, font, size: 23, color: accent })] })];
-    if (block.kind === 'contact') return [new Paragraph({ spacing: { after: 190 }, border: { bottom: { color: accent, size: 12, style: 'single' } }, children: [new TextRun({ text, font, size: bodySize, color: '66717D' })] })];
-    if (block.kind === 'section') return [new Paragraph({ heading: HeadingLevel.HEADING_1, keepNext: true, spacing: { before: 260, after: 105 }, children: [new TextRun({ text: text.replace(/[:：]$/, ''), bold: true, font, size: 24, color: accent })] })];
-    if (block.kind === 'entry') {
-      const entry = resumeEntry(block);
-      return [new Paragraph({
-        keepNext: true, spacing: { before: 100, after: 55 },
-        tabStops: [{ type: TabStopType.RIGHT, position: template === 'compact' ? 10_092 : 9_978 }],
-        children: [new TextRun({ text: entry.title, bold: true, font, size: 21, color: '18212B' }), ...(entry.date ? [new TextRun({ text: `\t${entry.date}`, font, size: 18, color: '66717D' })] : [])],
-      })];
-    }
-    if (block.kind === 'bullet') return [new Paragraph({ bullet: { level: 0 }, spacing: { after: 45, line }, children: [new TextRun({ text, font, size: bodySize })] })];
-    return [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 65, line }, children: [new TextRun({ text, font, size: bodySize })] })];
-  });
-  const document = new Document({
-    styles: { default: { document: { run: { font, size: bodySize }, paragraph: { spacing: { line } } } } },
-    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: template === 'compact' ? { top: 737, right: 907, bottom: 624, left: 907 } : { top: 850, right: 964, bottom: 794, left: 964 } } }, children }],
-  });
-  return Packer.toBlob(document);
-}
 
 async function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;

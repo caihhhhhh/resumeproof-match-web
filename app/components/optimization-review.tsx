@@ -1,6 +1,7 @@
 'use client';
 
 import type { MatchAnalysis } from '../lib/match-analysis';
+import { useState } from 'react';
 
 export type SuggestionDecision = 'pending' | 'accepted' | 'editing' | 'skipped';
 
@@ -16,6 +17,8 @@ type Props = {
 };
 
 export function OptimizationReview({ analysis, language, decisions, notes, onDecision, onNote, onBack, onBuildDraft }: Props) {
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [previous, setPrevious] = useState<Record<string, SuggestionDecision>>({});
   const suggestions = analysis.suggestions;
   const accepted = suggestions.filter((item) => decisions[item.id] === 'accepted').length;
   const skipped = suggestions.filter((item) => decisions[item.id] === 'skipped').length;
@@ -43,7 +46,8 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
   }
 
   function beginEditing(id: string, revisedText: string) {
-    if (!(id in notes)) onNote(id, revisedText);
+    setPrevious((value) => ({ ...value, [id]: decisions[id] ?? 'pending' }));
+    setEdits((value) => ({ ...value, [id]: notes[id] ?? revisedText }));
     onDecision(id, 'editing');
   }
 
@@ -57,13 +61,13 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
       {suggestions.length ? <div className="suggestion-list">
         {suggestions.map((suggestion, index) => {
           const decision = decisions[suggestion.id] ?? 'pending';
-          const editValue = notes[suggestion.id] ?? suggestion.revisedText;
+          const editValue = edits[suggestion.id] ?? notes[suggestion.id] ?? suggestion.revisedText;
           return (
             <article className={`suggestion-card is-${decision}`} key={suggestion.id}>
               <header><span>{String(index + 1).padStart(2, '0')}</span><div><small>{suggestion.kind === 'fact_check' ? text.factRequired : text.section}</small><h2>{suggestion.targetSection}</h2></div></header>
               <div className="rewrite-comparison">
                 <section><span>{text.original}</span><p>{suggestion.originalText}</p></section>
-                <section><span>{text.proposal}</span><p>{suggestion.revisedText || text.factRequired}</p></section>
+                <section><span>{decision === 'accepted' ? (language === 'zh' ? '已采用版本' : 'Adopted version') : text.proposal}</span><p>{(decision === 'accepted' ? notes[suggestion.id] : suggestion.revisedText) || text.factRequired}</p></section>
               </div>
               <div className="rewrite-context">
                 <p><span>{text.reason}</span>{suggestion.rationale}</p>
@@ -71,13 +75,22 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
                 <p><span>{text.requirement}</span>{suggestion.relatedRequirement}</p>
               </div>
               {suggestion.requiresFact && decision !== 'editing' && decision !== 'accepted' && <p className="fact-warning">{text.factRequired}</p>}
-              {(decision === 'editing' || decision === 'accepted') && (
-                <label className="rewrite-editor"><span>{text.proposal}</span><textarea value={editValue} rows={4} onChange={(event) => onNote(suggestion.id, event.target.value)} /></label>
+              {decision === 'editing' && (
+                <label className="rewrite-editor"><span>{language === 'zh' ? '修改建议 · 保存后才会采用' : 'Edit suggestion · adopt to save'}</span><textarea autoFocus value={editValue} rows={4} onChange={(event) => setEdits((value) => ({ ...value, [suggestion.id]: event.target.value }))} /></label>
               )}
               <div className="suggestion-actions">
-                {!suggestion.requiresFact && decision !== 'editing' && <button type="button" className={decision === 'accepted' ? 'is-selected' : ''} onClick={() => adopt(suggestion.id, suggestion.revisedText)}>{text.adopt}</button>}
-                <button type="button" className={decision === 'editing' ? 'is-selected' : ''} onClick={() => decision === 'editing' ? adopt(suggestion.id, editValue) : beginEditing(suggestion.id, suggestion.revisedText)} disabled={decision === 'editing' && !editValue.trim()}>{decision === 'editing' ? text.confirmEdit : text.edit}</button>
-                <button type="button" className={decision === 'skipped' ? 'is-selected' : ''} onClick={() => onDecision(suggestion.id, 'skipped')}>{text.skip}</button>
+                {decision === 'editing' ? <>
+                  <button type="button" onClick={() => onDecision(suggestion.id, previous[suggestion.id] ?? 'pending')}>{language === 'zh' ? '取消修改' : 'Cancel'}</button>
+                  <button type="button" className="suggestion-primary" disabled={!editValue.trim()} onClick={() => adopt(suggestion.id, editValue.trim())}>{text.confirmEdit}</button>
+                </> : decision === 'accepted' || decision === 'skipped' ? <>
+                  <span className="suggestion-status" role="status">{decision === 'accepted' ? (language === 'zh' ? '✓ 已采用，将合并到审核稿' : '✓ Adopted for the draft') : (language === 'zh' ? '已保留原文' : 'Original text kept')}</span>
+                  {decision === 'accepted' && <button type="button" onClick={() => beginEditing(suggestion.id, suggestion.revisedText)}>{language === 'zh' ? '继续修改' : 'Edit again'}</button>}
+                  <button type="button" onClick={() => onDecision(suggestion.id, 'pending')}>{language === 'zh' ? '撤销选择' : 'Undo decision'}</button>
+                </> : <>
+                  {!suggestion.requiresFact && <button type="button" className="suggestion-primary" onClick={() => adopt(suggestion.id, suggestion.revisedText)}>{text.adopt}</button>}
+                  <button type="button" onClick={() => beginEditing(suggestion.id, suggestion.revisedText)}>{text.edit}</button>
+                  <button type="button" onClick={() => onDecision(suggestion.id, 'skipped')}>{language === 'zh' ? '保留原文' : 'Keep original'}</button>
+                </>}
               </div>
             </article>
           );
@@ -87,7 +100,7 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
       {suggestions.length > 0 && <p className={`review-state${reviewComplete ? ' is-ready' : ''}`}>{reviewComplete ? text.ready : text.needMore}</p>}
       <div className="review-actions">
         <button type="button" className="review-back" onClick={onBack}><span aria-hidden="true">←</span>{text.back}</button>
-        <button type="button" title={reviewComplete ? text.next : text.needMore} onClick={onBuildDraft}>{text.next}<span aria-hidden="true">→</span></button>
+        <button type="button" className={`review-next${reviewComplete ? ' is-ready' : ''}`} title={reviewComplete ? text.next : text.needMore} onClick={onBuildDraft}>{reviewComplete ? text.next : (language === 'zh' ? '先审核已采用内容与原文' : 'Review adopted edits and original text')}<span aria-hidden="true">→</span></button>
       </div>
     </div>
   );

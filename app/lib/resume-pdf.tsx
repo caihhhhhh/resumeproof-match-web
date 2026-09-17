@@ -11,11 +11,20 @@ import {
 } from '@react-pdf/renderer';
 import type { ReviewBlock, ResumeTemplate } from '../components/resume-document';
 import { resumeEntry } from '../components/resume-document';
+import { resumeLayout } from './resume-layout';
 
 const CJK_FONT_FAMILY = 'ResumeProof Noto Sans SC';
 const CJK_FONT_URL = 'https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@Sans2.004/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf';
 const CJK_FONT_BOLD_URL = 'https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@Sans2.004/Sans/SubsetOTF/SC/NotoSansSC-Bold.otf';
 let cjkRegistered = false;
+Font.registerHyphenationCallback((word) => [word]);
+
+// Textkit treats non-space breaks as hyphenation. Tiny space runs supply natural
+// CJK wrap opportunities without adding visible hyphens or widening glyph gaps.
+function pdfText(value: string) {
+  const parts = value.match(/[\u2e80-\u9fff\uf900-\ufaff][，。、；：！？）】》”’]*|[^\u2e80-\u9fff\uf900-\ufaff]+/gu) ?? [value];
+  return parts.flatMap((part, index) => index ? [<Text key={index} style={{ fontSize: 0.01 }}> </Text>, part] : [part]);
+}
 
 function containsCjk(value: string) {
   return /[\u2e80-\u9fff\uf900-\ufaff]/u.test(value);
@@ -33,55 +42,24 @@ function ensureFonts(blocks: ReviewBlock[]) {
   cjkRegistered = true;
 }
 
-const shared = {
-  page: {
-    size: 'A4' as const,
-    paddingTop: 42.5,
-    paddingRight: 48.2,
-    paddingBottom: 39.7,
-    paddingLeft: 48.2,
-    backgroundColor: '#ffffff',
-    color: '#18212b',
-    fontSize: 10.4,
-    lineHeight: 1.6,
-  },
-  name: { marginBottom: 3, color: '#18212b', fontSize: 23, fontWeight: 700 as const, lineHeight: 1.18, letterSpacing: 0.2 },
-  headline: { marginBottom: 4, color: '#315f78', fontSize: 11.3, fontWeight: 700 as const, letterSpacing: 0.3 },
-  contact: { marginTop: 2, marginBottom: 0, paddingBottom: 17, borderBottomWidth: 1.5, borderBottomColor: '#315f78', color: '#66717d', fontSize: 9.7 },
-  section: { marginTop: 15.6, marginBottom: 9.1, color: '#315f78', fontSize: 12.2, fontWeight: 700 as const, lineHeight: 1.3, letterSpacing: 1.3 },
-  entry: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, gap: 12, marginTop: 12.2, marginBottom: 3.7 },
-  entryTitle: { flexGrow: 1, flexShrink: 1, color: '#18212b', fontSize: 10.8, fontWeight: 700 as const, lineHeight: 1.4 },
-  entryDate: { flexShrink: 0, color: '#66717d', fontSize: 9.2, lineHeight: 1.4 },
-  body: { marginBottom: 7.9 },
-  bullet: { flexDirection: 'row' as const, gap: 4, marginBottom: 3.5 },
-  bulletMark: { width: 10, color: '#315f78', fontSize: 7.7 },
-  bulletText: { flexGrow: 1, flexShrink: 1 },
-};
-
-const compact = {
-  ...shared,
-  page: { ...shared.page, paddingTop: 36.9, paddingRight: 45.4, paddingBottom: 31.2, paddingLeft: 45.4, fontSize: 9.5, lineHeight: 1.46 },
-  name: { ...shared.name, fontSize: 21 },
-  headline: { ...shared.headline, fontSize: 10.5 },
-  contact: { ...shared.contact, paddingBottom: 12, fontSize: 9 },
-  section: { ...shared.section, marginTop: 11.4, marginBottom: 6.8, fontSize: 11.5 },
-  entry: { ...shared.entry, marginTop: 8.5, marginBottom: 2.8 },
-  entryTitle: { ...shared.entryTitle, fontSize: 10.1 },
-  entryDate: { ...shared.entryDate, fontSize: 8.7 },
-  body: { marginBottom: 4.5 },
-  bullet: { ...shared.bullet, marginBottom: 2.3 },
-};
-
-const minimal = {
-  ...shared,
-  headline: { ...shared.headline, color: '#3e4954' },
-  contact: { ...shared.contact, borderBottomColor: '#9aa4ae' },
-  section: { ...shared.section, color: '#18212b', letterSpacing: 0.7 },
-  bulletMark: { ...shared.bulletMark, color: '#66717d' },
-};
-
 function templateStyles(template: ResumeTemplate) {
-  return StyleSheet.create(template === 'compact' ? compact : template === 'minimal' ? minimal : shared);
+  const m = resumeLayout(template);
+  return StyleSheet.create({
+    page: { paddingTop: m.top, paddingRight: m.side, paddingBottom: m.bottom, paddingLeft: m.side, color: m.ink, backgroundColor: '#fff', fontSize: m.body, lineHeight: m.leading },
+    name: { fontSize: m.name, fontWeight: 700, marginBottom: 5, lineHeight: 1.15 },
+    headline: { fontSize: m.headline, color: m.muted, marginBottom: 5, lineHeight: 1.4 },
+    contact: { fontSize: m.contact, color: m.muted, marginBottom: 4, lineHeight: 1.5 },
+    section: { fontSize: m.section, fontWeight: 700, color: m.accent, marginTop: m.sectionBefore, marginBottom: m.sectionAfter, lineHeight: 1.35 },
+    entry: { marginTop: m.entryBefore, marginBottom: m.entryAfter },
+    entryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 14 },
+    entryTitle: { flexGrow: 1, flexShrink: 1, fontSize: m.entry, fontWeight: 700, lineHeight: 1.4 },
+    entryDate: { maxWidth: 150, flexShrink: 0, fontSize: m.date, color: m.muted, textAlign: 'right', lineHeight: 1.4 },
+    role: { fontSize: m.role, color: m.muted, marginTop: 3, lineHeight: 1.4 },
+    body: { marginBottom: m.paragraphAfter },
+    bullet: { flexDirection: 'row', marginBottom: m.bulletAfter },
+    bulletMark: { width: 12, fontSize: 8, color: m.muted, lineHeight: m.body * m.leading / 8 },
+    bulletText: { flexGrow: 1, flexShrink: 1 },
+  });
 }
 
 function ResumePdfDocument({ blocks, template, language }: { blocks: ReviewBlock[]; template: ResumeTemplate; language: 'zh' | 'en' }) {
@@ -100,19 +78,19 @@ function ResumePdfDocument({ blocks, template, language }: { blocks: ReviewBlock
           const key = `${block.kind}-${index}`;
           const text = block.text.trim();
           if (!text) return null;
-          if (block.kind === 'name') return <Text key={key} style={styles.name}>{text}</Text>;
-          if (block.kind === 'headline') return <Text key={key} style={styles.headline}>{text}</Text>;
-          if (block.kind === 'contact') return <Text key={key} style={styles.contact}>{text}</Text>;
-          if (block.kind === 'section') return <Text key={key} style={styles.section} minPresenceAhead={42}>{text.replace(/[:：]$/, '')}</Text>;
+          if (block.kind === 'name') return <Text key={key} style={styles.name}>{pdfText(text)}</Text>;
+          if (block.kind === 'headline') return <Text key={key} style={styles.headline}>{pdfText(text)}</Text>;
+          if (block.kind === 'contact') return <Text key={key} style={styles.contact}>{pdfText(text)}</Text>;
+          if (block.kind === 'section') return <Text key={key} style={styles.section} minPresenceAhead={42}>{pdfText(text.replace(/[:：]$/, ''))}</Text>;
           if (block.kind === 'entry') {
             const entry = resumeEntry(block);
-            return <View key={key} style={styles.entry} minPresenceAhead={28}><Text style={styles.entryTitle}>{entry.title}</Text>{entry.date && <Text style={styles.entryDate}>{entry.date}</Text>}</View>;
+            return <View key={key} wrap={false} style={[styles.entry, ...(blocks[index - 1]?.kind === 'section' ? [{ marginTop: 0 }] : [])]} minPresenceAhead={32}><View style={styles.entryRow}><Text style={styles.entryTitle}>{pdfText(entry.organization)}</Text>{entry.date && <Text style={styles.entryDate}>{pdfText(entry.date)}</Text>}</View>{entry.role && <Text style={styles.role}>{pdfText(entry.role)}</Text>}</View>;
           }
           if (block.kind === 'bullet') {
             const normalized = text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '').trim();
-            return <View key={key} style={styles.bullet} wrap><Text style={styles.bulletMark}>•</Text><Text style={styles.bulletText}>{normalized}</Text></View>;
+            return <View key={key} style={styles.bullet} wrap={normalized.length > 700}><Text style={styles.bulletMark}>•</Text><Text style={styles.bulletText} orphans={2} widows={2}>{pdfText(normalized)}</Text></View>;
           }
-          return <Text key={key} style={styles.body}>{text}</Text>;
+          return <Text key={key} style={styles.body} orphans={2} widows={2}>{pdfText(text)}</Text>;
         })}
       </Page>
     </Document>

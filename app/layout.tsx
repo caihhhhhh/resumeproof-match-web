@@ -5,6 +5,7 @@ import { GoogleAnalytics } from './components/google-analytics';
 import { JsonLd } from './components/json-ld';
 import { SITE_ORIGIN } from './lib/site';
 import './globals.css';
+import './ui-theme.css';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',

@@ -1,13 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { useGSAP } from '@gsap/react';
 import type { AdminRangeKey, AdminRuntimeData } from '../lib/admin-runtime';
 
-gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 type AdminDashboardProps = {
   adminName: string;
@@ -72,7 +68,6 @@ function formatPointChange(current: number | null, previous: number | null) {
 }
 
 export default function AdminDashboard({ adminName, adminEmail, signOutPath, siteOrigin, runtimeData }: AdminDashboardProps) {
-  const shellRef = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState<AdminRangeKey>('24h');
   const [search, setSearch] = useState('');
   const [utmChannel, setUtmChannel] = useState(0);
@@ -121,51 +116,12 @@ export default function AdminDashboard({ adminName, adminEmail, signOutPath, sit
     }
   }
 
-  useGSAP(() => {
-    gsap.from('.admin-kpi-card', {
-      y: 28,
-      opacity: 0,
-      duration: 0.75,
-      stagger: 0.08,
-      ease: 'power3.out',
-    });
-
-    gsap.from('.admin-incident', {
-      y: 36,
-      opacity: 0,
-      stagger: 0.1,
-      ease: 'power2.out',
-      scrollTrigger: {
-        trigger: '.admin-incident-stack',
-        start: 'top 84%',
-        end: 'top 58%',
-        scrub: 0.5,
-      },
-    });
-
-    gsap.fromTo('.admin-credential-card', {
-      opacity: 0.32,
-      scale: 0.985,
-    }, {
-      opacity: 1,
-      scale: 1,
-      stagger: 0.12,
-      ease: 'power3.out',
-      scrollTrigger: {
-        trigger: '.admin-credential-grid',
-        start: 'top 88%',
-        end: 'top 60%',
-        scrub: 0.5,
-      },
-    });
-  }, { scope: shellRef });
-
   const visibleRequests = snapshot.requests.filter((item) =>
     `${item.type} ${item.source} ${item.model} ${item.status}`.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
-    <div className="admin-shell" ref={shellRef}>
+    <div className="admin-shell">
       <aside className="admin-sidebar">
         <Link href="/" className="admin-brand" aria-label="返回 ResumeProof Match 首页">
           <span className="admin-brand-mark">RP</span>
