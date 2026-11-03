@@ -41,3 +41,6 @@ next-env.d.ts
 /tmp/
 *.tsbuildinfo
 /.openai/hosting.json
+
+# local design critique cache
+/.impeccable/

@@ -1,0 +1,9 @@
+[
+  {"antipattern":"side-tab","name":"Side-tab accent border","severity":"warning","category":"slop","file":"D:\\Codex\\简历自动化\\resume-proof-match-web\\app\\globals.css","line":340,"snippet":"border-left: 2px solid var(--admin-lime)","importedBy":["layout.tsx"]},
+  {"antipattern":"side-tab","name":"Side-tab accent border","severity":"warning","category":"slop","file":"D:\\Codex\\简历自动化\\resume-proof-match-web\\app\\globals.css","line":900,"snippet":"border-left: 2px solid #c18b22","importedBy":["layout.tsx"]},
+  {"antipattern":"side-tab","name":"Side-tab accent border","severity":"warning","category":"slop","file":"D:\\Codex\\简历自动化\\resume-proof-match-web\\app\\globals.css","line":911,"snippet":"border-left: 2px solid #c18b22","importedBy":["layout.tsx"]},
+  {"antipattern":"side-tab","name":"Side-tab accent border","severity":"warning","category":"slop","file":"D:\\Codex\\简历自动化\\resume-proof-match-web\\app\\globals.css","line":945,"snippet":"border-left: 2px solid #c18b22","importedBy":["layout.tsx"]},
+  {"antipattern":"overused-font","name":"Overused font","severity":"warning","category":"slop","file":"D:\\Codex\\简历自动化\\resume-proof-match-web\\app\\globals.css","line":1080,"snippet":"font-family: Arial","importedBy":["layout.tsx"]},
+  {"antipattern":"codex-grid-background","name":"Decorative grid-line background","severity":"advisory","category":"slop","file":"D:\\Codex\\简历自动化\\resume-proof-match-web\\app\\globals.css","line":412,"snippet":"two-axis grid-line gradient background","advisory":true,"importedBy":["layout.tsx"]},
+  {"antipattern":"overused-font","name":"Overused font","severity":"warning","category":"slop","file":"D:\\Codex\\简历自动化\\resume-proof-match-web\\app\\lib\\resume-layout.ts","line":20,"snippet":"font-family:Arial","importedBy":["resume-document.tsx","resume-export.ts","resume-pdf.tsx"]}
+]
