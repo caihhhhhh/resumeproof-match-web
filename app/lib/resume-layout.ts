@@ -13,11 +13,14 @@ export function resumeLayout(template: 'balanced' | 'compact' | 'minimal') {
   };
 }
 
-export const resumeDocumentCss = (['balanced', 'compact', 'minimal'] as const).map((template) => {
+export const resumeDocumentCss = `
+@font-face { font-family:"ResumeProof Noto Sans SC"; src:url("/fonts/NotoSansSC-Regular.otf") format("opentype"); font-weight:400; font-display:swap; }
+@font-face { font-family:"ResumeProof Noto Sans SC"; src:url("/fonts/NotoSansSC-Bold.otf") format("opentype"); font-weight:700; font-display:swap; }
+` + (['balanced', 'compact', 'minimal'] as const).map((template) => {
   const m = resumeLayout(template);
   const s = `.resume-paper.resume-paper.template-${template}`;
   return `
-${s} { box-sizing:border-box; width:210mm; max-width:100%; min-height:297mm; padding:${m.top}pt ${m.side}pt ${m.bottom}pt; margin:0 auto; background:white; color:${m.ink}; font-family:Arial,"Microsoft YaHei","PingFang SC",sans-serif; font-size:${m.body}pt; line-height:${m.leading}; text-align:left; }
+${s} { box-sizing:border-box; width:210mm; max-width:100%; min-height:297mm; padding:${m.top}pt ${m.side}pt ${m.bottom}pt; margin:0 auto; background:white; color:${m.ink}; font-family:"ResumeProof Noto Sans SC",Arial,"Microsoft YaHei","PingFang SC",sans-serif; font-size:${m.body}pt; line-height:${m.leading}; text-align:left; }
 ${s} h1 { margin:0 0 5pt; font-size:${m.name}pt; line-height:1.15; font-weight:700; letter-spacing:0; color:${m.ink}; }
 ${s} h2 { margin:${m.sectionBefore}pt 0 ${m.sectionAfter}pt; font-size:${m.section}pt; line-height:1.35; font-weight:700; letter-spacing:0; color:${m.accent}; break-after:avoid; }
 ${s} p { margin:0 0 ${m.paragraphAfter}pt; font-size:${m.body}pt; line-height:${m.leading}; overflow-wrap:anywhere; orphans:2; widows:2; }

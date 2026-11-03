@@ -1,0 +1,217 @@
+/* Working UI only. No selectors target the résumé paper or exported typography. */
+@media screen {
+  :is(.workspace-shell, .info-page-shell) {
+    font-family: var(--font-geist-sans), "PingFang SC", "Microsoft YaHei", sans-serif;
+    --workspace-focus: #0068d9;
+  }
+
+  :is(.workspace-shell, .info-page-shell) :is(h1, h2, h3, button, summary) {
+    letter-spacing: normal;
+  }
+
+  .workspace-shell :is(.workspace-header h1, .workbench-heading h1, .text-review-header h1) {
+    font-size: 2rem;
+    line-height: 1.35;
+  }
+
+  :is(.workspace-shell, .info-page-shell, .site-footer, .analytics-consent)
+    :is(button, input, textarea, select, summary, a, [tabindex]):focus-visible {
+    outline: 3px solid #0068d9;
+    outline-offset: 3px;
+  }
+
+  .workspace-shell :is(.compact-upload, .jd-file-upload):focus-within {
+    outline: 3px solid var(--workspace-focus);
+    outline-offset: 3px;
+    border-color: var(--workspace-focus);
+  }
+
+  .workspace-shell :is(.compact-upload, .jd-file-upload) input:focus-visible {
+    outline: 0;
+  }
+
+  .workspace-shell :is(.resume-editor-field, .experience-editor-meta label):focus-within {
+    border-color: var(--workspace-focus);
+    box-shadow: inset 0 0 0 2px var(--workspace-focus);
+  }
+
+  .workspace-shell :is(.material-textarea, .universal-jd, .parsed-review, .rewrite-editor,
+    .resume-editor-field, .experience-editor-meta, .resume-editor-section-name, .raw-resume-editor)
+    :is(input, textarea) {
+    font-family: var(--font-geist-sans), "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 1rem;
+    line-height: 1.7;
+    caret-color: var(--cobalt);
+  }
+
+  .workspace-shell :is(.material-card header p, .workspace-action p, .job-summary,
+    .analysis-summary, .result-verdict blockquote, .decision-primary > b,
+    .result-priorities li p, .priority-empty, .result-dimensions p,
+    .hard-requirements header p, .hard-requirements article > p,
+    .hard-requirements blockquote, .hard-empty, .evidence-section summary p,
+    .evidence-list blockquote, .evidence-list .evidence-rationale,
+    .fact-warning, .fact-audit header p, .fact-export-block, .pdf-readiness p,
+    .review-quality-status, .empty-suggestions, .review-state,
+    .result-feedback > div > p, .feedback-error, .analysis-error) {
+    font-size: .9375rem;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+
+  .workspace-shell :is(.hard-requirements h3, .evidence-list .evidence-requirement,
+    .fact-change-list b, .pdf-readiness strong) {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .workspace-shell :is(.material-status span, .base-resume-tools small, .file-copy small,
+    .compact-upload em, .jd-file-upload small, .material-textarea small, .universal-jd small,
+    .parsed-review summary span, .material-or, .results-toolbar small,
+    .decision-primary > span, .decision-summary > p > span, .decision-summary > p small,
+    .result-verdict > small, .result-priorities li span, .result-dimensions header span,
+    .hard-status, .hard-requirements article small, .hard-requirements blockquote span,
+    .evidence-topline > small, .evidence-status, .evidence-list article > small,
+    .evidence-list blockquote span, .evidence-rationale span,
+    .suggestion-card header small, .rewrite-comparison span, .rewrite-context span,
+    .rewrite-editor > span, .review-toolbar small, .review-toolbar span,
+    .review-preview-column .review-toolbar small, .review-preview-column .review-toolbar > span,
+    .draft-status, .structured-editor-intro small, .resume-editor-group > summary small,
+    .resume-editor-section-name > span, .experience-editor-card > header strong,
+    .fact-change-list small, .fact-change-list em, .raw-resume-editor p,
+    .resume-section-library p, .resume-section-library button small,
+    .sample-consent, .sample-receipt, .feedback-reasons > span,
+    .adopted-change-list small, .adopted-change-list > summary strong, .export-print-hint) {
+    font-size: .8125rem;
+    line-height: 1.6;
+    letter-spacing: normal;
+  }
+
+  .workspace-shell :is(.structured-editor-intro p, .resume-editor-empty, .adopted-change-empty) {
+    font-size: .9375rem;
+    line-height: 1.7;
+  }
+
+  .workspace-shell .structured-editor-intro small,
+  .workspace-shell .resume-editor-group > summary small {
+    color: #596575;
+  }
+
+  .workspace-shell .result-verdict,
+  .workspace-shell .decision-primary,
+  .workspace-shell .result-priorities,
+  .workspace-shell .hard-requirements article,
+  .workspace-shell .fact-audit > header > div {
+    min-width: 0;
+  }
+
+  .workspace-shell .result-priorities li {
+    grid-template-columns: minmax(4.25rem, auto) minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .workspace-shell .decision-primary strong { max-width: none; }
+  .workspace-shell .result-verdict > small { max-width: 70ch; }
+  .workspace-shell .optimization-progress { font-size: .8125rem !important; }
+  .workspace-shell .suggestion-card.is-skipped { opacity: 1; background: #f7f8f9; }
+  .workspace-shell .review-preview-column .review-toolbar > span { white-space: normal; }
+
+  .workspace-shell :is(.material-tabs button, .base-resume-actions button, .base-resume-save,
+    .demo-material-button, .sample-receipt button, .results-toolbar button,
+    .review-history-controls button, .resume-editor-section-actions button,
+    .resume-editor-field-actions button, .experience-editor-card > header button,
+    .resume-editor-add, .resume-section-library button,
+    .review-template-options button, .review-template-options label,
+    .review-view-switch button, .feedback-primary button, .feedback-reasons button,
+    .suggestion-actions button, .result-next-actions button) {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: .875rem;
+    line-height: 1.4;
+  }
+
+  .language-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .site-footer .footer-links { grid-auto-rows: minmax(44px, auto); gap: 4px 32px; }
+  .site-footer :is(a, button) { min-height: 44px; }
+  .site-footer :is(.footer-wordmark, .footer-meta a, .footer-analytics) {
+    display: inline-flex;
+    align-items: center;
+  }
+  .site-footer .footer-meta { font-size: .8125rem; }
+  .site-footer .footer-analytics { padding-inline: 8px; }
+  .analytics-consent button { min-height: 44px; }
+
+  .workspace-shell :is(.review-history-controls, .resume-editor-field-actions,
+    .experience-editor-card > header > div) { gap: 6px; }
+  .workspace-shell .resume-editor-field { grid-template-columns: minmax(0, 1fr); }
+  .workspace-shell .resume-editor-field-actions { justify-content: flex-end; }
+  .workspace-shell .experience-editor-card > header { flex-wrap: wrap; }
+  .workspace-shell .experience-editor-card > header strong { white-space: normal; overflow-wrap: anywhere; }
+  .workspace-shell .experience-editor-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workspace-shell .experience-editor-meta label:last-child { grid-column: 1 / -1; }
+
+  .workspace-shell :is(.material-textarea, .universal-jd, .resume-editor-field,
+    .experience-editor-meta, .raw-resume-editor) ::placeholder { color: #646b75; opacity: 1; }
+  .workspace-shell ::selection, .info-page-shell ::selection { background: #cce3ff; color: #12375f; }
+
+  @media (min-width: 761px) {
+    .workspace-shell :is(.workspace-action > button, .review-actions button,
+      .result-next-actions button, .text-review-actions button, .export-more > summary) {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .workspace-shell .review-export-actions { flex-wrap: wrap; justify-content: flex-end; }
+    .workspace-shell .text-review-actions { flex-wrap: wrap; }
+  }
+
+  @media (max-width: 760px) {
+    .workspace-shell :is(.workspace-header h1, .workbench-heading h1, .text-review-header h1) {
+      font-size: 1.75rem;
+    }
+    .workspace-shell :is(.workspace-nav, .workspace-main, .match-workbench, .text-review-shell),
+    .info-page-shell :is(.info-nav, .info-article) { width: calc(100% - 32px); }
+    .workspace-shell .material-status { display: flex; flex-wrap: wrap; }
+    .workspace-shell .compact-upload { grid-template-columns: auto minmax(0, 1fr); padding: 16px; }
+    .workspace-shell .compact-upload em { grid-column: 2; }
+    .workspace-shell :is(.file-copy small, .jd-file-upload b) { white-space: normal; overflow-wrap: anywhere; }
+    .workspace-shell .material-card { padding: 18px; }
+    .workspace-shell .material-card > header { gap: 12px; }
+    .workspace-shell .sample-consent { display: grid; grid-template-columns: 18px minmax(0, 1fr); }
+    .workspace-shell .sample-consent a { grid-column: 2; width: fit-content; min-height: 44px; display: inline-flex; align-items: center; }
+    .workspace-shell :is(.result-next-actions, .workspace-action, .structured-editor-intro,
+      .review-template-bar, .text-review-actions) { flex-direction: column; align-items: stretch; }
+    .workspace-shell .result-next-actions button { width: 100%; }
+    .workspace-shell .structured-editor-intro { gap: 14px; }
+    .workspace-shell .review-history-controls { flex-wrap: wrap; }
+    .workspace-shell .resume-editor-fields { padding: 14px; }
+    .workspace-shell .experience-editor-meta { grid-template-columns: minmax(0, 1fr); }
+    .workspace-shell .experience-editor-meta label:last-child { grid-column: auto; }
+    .workspace-shell .resume-editor-section-actions button.is-danger { margin-inline-start: 0; }
+    .workspace-shell .resume-section-library > div > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .workspace-shell .result-priorities li { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+    .workspace-shell .hard-requirements article > div { flex-wrap: wrap; gap: 8px; }
+    .workspace-shell .optimization-heading { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .workspace-shell .optimization-progress { justify-self: start; white-space: normal; }
+    .workspace-shell .suggestion-actions { flex-wrap: wrap; }
+    .workspace-shell .suggestion-actions button { flex: 1 1 120px; }
+    .workspace-shell .fact-audit > header { flex-wrap: wrap; gap: 12px; }
+    .workspace-shell .fact-change-list { grid-template-columns: minmax(0, 1fr); }
+    .site-footer { min-width: 0; padding-inline: 16px; }
+    .site-footer .footer-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
+    .site-footer :is(.footer-intro, .footer-meta) { min-width: 0; overflow-wrap: anywhere; }
+  }
+}
+
+@media (forced-colors: active) {
+  :is(.workspace-shell, .info-page-shell, .site-footer, .analytics-consent)
+    :is(button, input, textarea, select, summary, a, [tabindex]):focus-visible,
+  .workspace-shell :is(.compact-upload, .jd-file-upload):focus-within {
+    outline-color: Highlight;
+  }
+}

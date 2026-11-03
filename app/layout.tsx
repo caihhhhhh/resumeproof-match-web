@@ -6,6 +6,7 @@ import { JsonLd } from './components/json-ld';
 import { SITE_ORIGIN } from './lib/site';
 import './globals.css';
 import './ui-theme.css';
+import './components/workspace-refinement.css';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',

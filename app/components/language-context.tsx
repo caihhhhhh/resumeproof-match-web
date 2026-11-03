@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 export type Language = 'zh' | 'en';
 
@@ -11,30 +12,63 @@ type LanguageContextValue = {
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
+const LANGUAGE_STORAGE_KEY = 'resumematch-language';
+
+function readSavedLanguage(): Language {
+  try {
+    const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    return saved === 'en' ? 'en' : 'zh';
+  } catch {
+    // Storage can be denied in private or embedded browsing contexts.
+    return 'zh';
+  }
+}
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>('zh');
+  const pathname = usePathname();
+  const [language, setLanguageState] = useState<Language>('zh');
+  const [restored, setRestored] = useState(false);
+  const initialized = useRef(false);
+  const selectionVersion = useRef(0);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const saved = window.localStorage.getItem('resumematch-language');
-      if (saved === 'zh' || saved === 'en') setLanguage(saved);
-    }, 0);
-    return () => window.clearTimeout(timer);
+  const setLanguage = useCallback((next: Language) => {
+    selectionVersion.current += 1;
+    initialized.current = true;
+    setLanguageState(next);
+    setRestored(true);
+    try {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
+    } catch {
+      // Changing language still works when preference persistence is unavailable.
+    }
   }, []);
 
   useEffect(() => {
+    const englishRoute = /^\/en(?:\/|$)/.test(pathname ?? '');
+    if (initialized.current && !englishRoute) return;
+    const version = selectionVersion.current;
+    const timer = window.setTimeout(() => {
+      // Do not overwrite a choice made while preference restoration was pending.
+      if (version !== selectionVersion.current) return;
+      setLanguageState(englishRoute ? 'en' : readSavedLanguage());
+      initialized.current = true;
+      setRestored(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!restored) return;
     document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
-    window.localStorage.setItem('resumematch-language', language);
-  }, [language]);
+  }, [language, restored]);
 
   const value = useMemo(
     () => ({
       language,
       setLanguage,
-      toggleLanguage: () => setLanguage((current) => (current === 'zh' ? 'en' : 'zh')),
+      toggleLanguage: () => setLanguage(language === 'zh' ? 'en' : 'zh'),
     }),
-    [language],
+    [language, setLanguage],
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

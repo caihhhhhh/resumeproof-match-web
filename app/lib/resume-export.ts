@@ -6,6 +6,7 @@ const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;
 
 export function standaloneResumeHtml(blocks: ReviewBlock[], template: ResumeTemplate, language: 'zh' | 'en') {
   const m = resumeLayout(template);
+  const documentCss = typeof window === 'undefined' ? resumeDocumentCss : resumeDocumentCss.replaceAll('url("/fonts/', `url("${window.location.origin}/fonts/`);
   const body = blocks.map((block) => {
     const normalized = block.kind === 'bullet' ? block.text.replace(/^(?:[•·▪◦]|[-*]\s)\s*/, '') : block.text;
     if (!normalized.trim()) return '';
@@ -20,7 +21,7 @@ export function standaloneResumeHtml(blocks: ReviewBlock[], template: ResumeTemp
   }).join('\n');
   return `<!doctype html><html lang="${language === 'zh' ? 'zh-CN' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Resume</title><style>
   body{margin:0;background:#eef0f2} .resume-paper{box-shadow:0 3px 18px #20252b18}
-  ${resumeDocumentCss}
+  ${documentCss}
   @page{size:A4;margin:${m.top}pt ${m.side}pt ${m.bottom}pt}
   @media print{body{background:white}.resume-paper.resume-paper.template-${template}{width:auto;max-width:none;min-height:0;padding:0;margin:0;box-shadow:none}}
   </style></head><body><main class="resume-paper template-${template}">${body}</main></body></html>`;

@@ -6,6 +6,13 @@ type DemoMaterials = {
   analysis: MatchAnalysis;
 };
 
+const zhOriginal = '负责受众与素材 A/B Test，并根据测试结果调整投放组合；注册成本下降 28%。';
+const enOriginal = 'Ran audience and creative A/B tests and used the results to adjust the campaign mix. Registration cost fell 28%.';
+const zhRevised = '注册成本下降 28%。通过受众与素材 A/B Test 调整投放组合。';
+const enRevised = 'Reduced registration cost by 28%. Adjusted the campaign mix based on audience and creative A/B tests.';
+const zhKept = '搭建 GA4 与 UTM 渠道看板，按周分析访问、注册和付费转化，并输出预算调整建议。';
+const enKept = 'Built GA4 and UTM dashboards to review traffic, registration, and paid conversion each week and recommend budget changes.';
+
 const zhResume = `林晨
 增长营销｜Campaign 运营
 demo@example.com
@@ -16,8 +23,8 @@ demo@example.com
 工作经历
 Example Labs｜增长营销经理｜2023.06 - 至今
 • 独立负责季度广告预算及 Campaign Brief，协调设计、产品与数据团队推进素材上线。
-• 通过受众与素材 A/B Test 调整投放组合，使注册成本下降 28%。
-• 搭建 GA4 与 UTM 渠道看板，按周分析访问、注册和付费转化，并输出预算调整建议。
+• ${zhOriginal}
+• ${zhKept}
 
 项目经历
 合作伙伴增长计划
@@ -54,8 +61,8 @@ Growth marketer with 3 years of experience across paid channels, content coordin
 Professional Experience
 Example Labs | Growth Marketing Manager | 2023.06 - Present
 • Owned quarterly advertising budgets and campaign briefs, coordinating design, product, and data teams to launch creative.
-• Reduced registration cost by 28% through audience and creative A/B tests.
-• Built GA4 and UTM dashboards to review traffic, registration, and paid conversion each week and recommend budget changes.
+• ${enOriginal}
+• ${enKept}
 
 Projects
 Partner Growth Program
@@ -86,19 +93,21 @@ function suggestion(source: string, originalText: string, revisedText: string, l
   const sourceStart = source.indexOf(originalText);
   return {
     id: 'demo-rewrite-1',
-    kind: 'rewrite',
+    kind: 'reorder',
     targetSection: language === 'zh' ? '工作经历' : 'Professional Experience',
     originalText,
     sourceStart,
     sourceEnd: sourceStart + originalText.length,
     revisedText,
     rationale: language === 'zh'
-      ? '原文已经有明确结果，但动作与结果之间的关系可以更紧凑，让招聘方更快识别优化能力。'
-      : 'The source already contains a clear result, but tightening the action-to-outcome link makes the optimization signal easier to scan.',
+      ? '把注册成本结果提前，再说明测试和投放调整。改变信息顺序，保留原有数据、动作和职责。'
+      : 'Lead with the cost result, then explain the tests and campaign changes. Reorders the same facts without adding metrics or responsibilities.',
     expectedImpact: language === 'zh'
-      ? '强化 A/B Test、投放调整和成本改善之间的因果关系。'
-      : 'Clarifies the connection between A/B testing, campaign changes, and cost improvement.',
-    relatedRequirement: language === 'zh' ? '持续优化 CPA 与转化漏斗' : 'Continuously improve CPA and funnel conversion',
+      ? '让招聘方先看到成本改善，再核对具体的优化动作。'
+      : 'Makes the cost outcome easier to scan, followed by the actions supporting it.',
+    relatedRequirement: language === 'zh'
+      ? '能够独立分析数据并将结论转化为具体优化动作。'
+      : 'Able to turn analysis into clear optimization actions.',
     requiresFact: false,
   };
 }
@@ -106,12 +115,8 @@ function suggestion(source: string, originalText: string, revisedText: string, l
 export function getDemoMaterials(language: 'zh' | 'en'): DemoMaterials {
   const resume = language === 'zh' ? zhResume : enResume;
   const jd = language === 'zh' ? zhJd : enJd;
-  const original = language === 'zh'
-    ? '通过受众与素材 A/B Test 调整投放组合，使注册成本下降 28%。'
-    : 'Reduced registration cost by 28% through audience and creative A/B tests.';
-  const revised = language === 'zh'
-    ? '基于受众与素材 A/B Test 调整投放组合，推动注册成本下降 28%。'
-    : 'Adjusted the campaign mix using audience and creative A/B tests, reducing registration cost by 28%.';
+  const original = language === 'zh' ? zhOriginal : enOriginal;
+  const revised = language === 'zh' ? zhRevised : enRevised;
   const analysis: MatchAnalysis = {
     mode: 'ai',
     summary: language === 'zh'
@@ -143,16 +148,16 @@ export function getDemoMaterials(language: 'zh' | 'en'): DemoMaterials {
     missingTerms: language === 'zh' ? ['ROAS 直接成果', '英语能力证明'] : ['Direct ROAS outcome', 'English-language evidence'],
     evidence: language === 'zh' ? [
       { requirement: '负责 Campaign 完整流程', importance: 'must', resumeEvidence: ['独立负责季度广告预算及 Campaign Brief，协调设计、产品与数据团队推进素材上线。'], rationale: '预算、Brief、素材上线和协作均有直接对应。', status: 'strong' },
-      { requirement: '优化 CPA 与转化漏斗', importance: 'must', resumeEvidence: ['通过受众与素材 A/B Test 调整投放组合，使注册成本下降 28%。'], rationale: '注册成本下降直接支持 CPA 优化，ROAS 暂无证据。', status: 'partial' },
-      { requirement: '熟悉 GA4 和数据分析', importance: 'must', resumeEvidence: ['搭建 GA4 与 UTM 渠道看板，按周分析访问、注册和付费转化，并输出预算调整建议。'], rationale: '工具、分析对象和后续动作均可核对。', status: 'strong' },
+      { requirement: '优化 CPA 与转化漏斗', importance: 'must', resumeEvidence: [zhOriginal], rationale: '注册成本下降直接支持 CPA 优化，ROAS 暂无证据。', status: 'partial' },
+      { requirement: '熟悉 GA4 和数据分析', importance: 'must', resumeEvidence: [zhKept], rationale: '工具、分析对象和后续动作均可核对。', status: 'strong' },
       { requirement: '跨团队推动落地', importance: 'important', resumeEvidence: ['协调设计、产品与数据团队推进素材上线。'], rationale: '明确列出协作团队与交付结果。', status: 'strong' },
       { requirement: '合作伙伴增长经验', importance: 'bonus', resumeEvidence: ['联合 12 家内容合作伙伴开展季度活动，跟踪激活与留存表现，推动 4 个高表现合作方进入长期合作。'], rationale: '包含合作规模、分析维度与长期转化。', status: 'strong' },
       { requirement: '3 年以上相关经验', importance: 'must', resumeEvidence: ['3 年增长营销经验'], rationale: '年限与岗位门槛直接对应。', status: 'strong' },
       { requirement: '英语可作为工作语言', importance: 'important', resumeEvidence: [], rationale: '简历没有可核对的英语使用场景或语言等级。', status: 'gap' },
     ] : [
       { requirement: 'Own campaigns end to end', importance: 'must', resumeEvidence: ['Owned quarterly advertising budgets and campaign briefs, coordinating design, product, and data teams to launch creative.'], rationale: 'Budget, briefs, launch delivery, and collaboration are directly supported.', status: 'strong' },
-      { requirement: 'Improve CPA and funnel conversion', importance: 'must', resumeEvidence: ['Reduced registration cost by 28% through audience and creative A/B tests.'], rationale: 'The cost result supports CPA optimization; direct ROAS evidence is missing.', status: 'partial' },
-      { requirement: 'Use GA4 and analyze performance', importance: 'must', resumeEvidence: ['Built GA4 and UTM dashboards to review traffic, registration, and paid conversion each week and recommend budget changes.'], rationale: 'The tool, analysis scope, and resulting action are all verifiable.', status: 'strong' },
+      { requirement: 'Improve CPA and funnel conversion', importance: 'must', resumeEvidence: [enOriginal], rationale: 'The cost result supports CPA optimization; direct ROAS evidence is missing.', status: 'partial' },
+      { requirement: 'Use GA4 and analyze performance', importance: 'must', resumeEvidence: [enKept], rationale: 'The tool, analysis scope, and resulting action are all verifiable.', status: 'strong' },
       { requirement: 'Work across product, design, and data', importance: 'important', resumeEvidence: ['coordinating design, product, and data teams to launch creative.'], rationale: 'The resume names the teams and delivery outcome.', status: 'strong' },
       { requirement: 'Partner growth experience', importance: 'bonus', resumeEvidence: ['Ran quarterly campaigns with 12 content partners, tracked activation and retention, and moved 4 high-performing partners into ongoing programs.'], rationale: 'Scale, performance analysis, and continued activation are present.', status: 'strong' },
       { requirement: '3+ years of relevant experience', importance: 'must', resumeEvidence: ['Growth marketer with 3 years of experience'], rationale: 'The stated experience meets the threshold.', status: 'strong' },
@@ -162,4 +167,13 @@ export function getDemoMaterials(language: 'zh' | 'en'): DemoMaterials {
     suggestions: [suggestion(resume, original, revised, language)],
   };
   return { resume, jd, analysis };
+}
+
+/** The homepage uses the same synthetic source and suggestion as the full demo. */
+export function getDemoPreview(language: 'zh' | 'en') {
+  const { analysis } = getDemoMaterials(language);
+  return {
+    suggestion: analysis.suggestions[0],
+    keptText: language === 'zh' ? zhKept : enKept,
+  };
 }

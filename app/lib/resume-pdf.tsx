@@ -14,8 +14,8 @@ import { resumeEntry } from '../components/resume-document';
 import { resumeLayout } from './resume-layout';
 
 const CJK_FONT_FAMILY = 'ResumeProof Noto Sans SC';
-const CJK_FONT_URL = 'https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@Sans2.004/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf';
-const CJK_FONT_BOLD_URL = 'https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@Sans2.004/Sans/SubsetOTF/SC/NotoSansSC-Bold.otf';
+const CJK_FONT_URL = '/fonts/NotoSansSC-Regular.otf';
+const CJK_FONT_BOLD_URL = '/fonts/NotoSansSC-Bold.otf';
 let cjkRegistered = false;
 Font.registerHyphenationCallback((word) => [word]);
 
@@ -26,12 +26,8 @@ function pdfText(value: string) {
   return parts.flatMap((part, index) => index ? [<Text key={index} style={{ fontSize: 0.01 }}> </Text>, part] : [part]);
 }
 
-function containsCjk(value: string) {
-  return /[\u2e80-\u9fff\uf900-\ufaff]/u.test(value);
-}
-
-function ensureFonts(blocks: ReviewBlock[]) {
-  if (cjkRegistered || !blocks.some((block) => containsCjk(block.text))) return;
+function ensureFonts() {
+  if (cjkRegistered) return;
   Font.register({
     family: CJK_FONT_FAMILY,
     fonts: [
@@ -64,7 +60,7 @@ function templateStyles(template: ResumeTemplate) {
 
 function ResumePdfDocument({ blocks, template, language }: { blocks: ReviewBlock[]; template: ResumeTemplate; language: 'zh' | 'en' }) {
   const styles = templateStyles(template);
-  const fontFamily = blocks.some((block) => containsCjk(block.text)) ? CJK_FONT_FAMILY : 'Helvetica';
+  const fontFamily = CJK_FONT_FAMILY;
   return (
     <Document
       title={language === 'zh' ? '求职简历' : 'Resume'}
@@ -98,6 +94,6 @@ function ResumePdfDocument({ blocks, template, language }: { blocks: ReviewBlock
 }
 
 export async function createResumePdfBlob(blocks: ReviewBlock[], template: ResumeTemplate, language: 'zh' | 'en') {
-  ensureFonts(blocks);
+  ensureFonts();
   return pdf(<ResumePdfDocument blocks={blocks} template={template} language={language} />).toBlob();
 }

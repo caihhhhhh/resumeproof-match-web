@@ -54,7 +54,7 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
   return (
     <div className="optimization-review" id="rewrite-suggestions" tabIndex={-1}>
       <header className="optimization-heading">
-        <div><span>{text.eyebrow}</span><h1>{text.title}</h1><p>{text.body}</p></div>
+        <div><span>{text.eyebrow}</span><h2>{text.title}</h2><p>{text.body}</p></div>
         {suggestions.length > 0 && <p className="optimization-progress">{pending > 0 ? `${pending} ${text.pending}` : `${accepted} ${text.accepted} · ${skipped} ${text.skipped}`}</p>}
       </header>
 
@@ -64,7 +64,7 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
           const editValue = edits[suggestion.id] ?? notes[suggestion.id] ?? suggestion.revisedText;
           return (
             <article className={`suggestion-card is-${decision}`} key={suggestion.id}>
-              <header><span>{String(index + 1).padStart(2, '0')}</span><div><small>{suggestion.kind === 'fact_check' ? text.factRequired : text.section}</small><h2>{suggestion.targetSection}</h2></div></header>
+              <header><span>{String(index + 1).padStart(2, '0')}</span><div><small>{suggestion.kind === 'fact_check' ? text.factRequired : text.section}</small><h3>{suggestion.targetSection}</h3></div></header>
               <div className="rewrite-comparison">
                 <section><span>{text.original}</span><p>{suggestion.originalText}</p></section>
                 <section><span>{decision === 'accepted' ? (language === 'zh' ? '已采用版本' : 'Adopted version') : text.proposal}</span><p>{(decision === 'accepted' ? notes[suggestion.id] : suggestion.revisedText) || text.factRequired}</p></section>
@@ -100,7 +100,7 @@ export function OptimizationReview({ analysis, language, decisions, notes, onDec
       {suggestions.length > 0 && <p className={`review-state${reviewComplete ? ' is-ready' : ''}`}>{reviewComplete ? text.ready : text.needMore}</p>}
       <div className="review-actions">
         <button type="button" className="review-back" onClick={onBack}><span aria-hidden="true">←</span>{text.back}</button>
-        <button type="button" className={`review-next${reviewComplete ? ' is-ready' : ''}`} title={reviewComplete ? text.next : text.needMore} onClick={onBuildDraft}>{reviewComplete ? text.next : (language === 'zh' ? '先审核已采用内容与原文' : 'Review adopted edits and original text')}<span aria-hidden="true">→</span></button>
+        <button type="button" className="review-next is-ready" title={text.needMore} onClick={onBuildDraft}>{accepted ? (language === 'zh' ? `审核简历（已采用 ${accepted} 条）` : `Review resume (${accepted} adopted)`) : (language === 'zh' ? '继续审核原文' : 'Review original resume')}<span aria-hidden="true">→</span></button>
       </div>
     </div>
   );

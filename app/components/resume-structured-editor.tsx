@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { preferredScrollBehavior } from '../lib/scroll';
 import { ReviewBlock, splitResumeEntry } from './resume-document';
 
 type Props = {
@@ -68,6 +70,8 @@ function withEntryField(block: ReviewBlock, field: 'organization' | 'role' | 'da
 
 export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange, rawValue, canUndo, canRedo, onUndo, onRedo }: Props) {
   const t = labels[language];
+  const [activeGroup, setActiveGroup] = useState<number | null>(0);
+  const [activeEntries, setActiveEntries] = useState<Record<number, number>>({});
   const groups = groupBlocks(blocks, t.header);
   const sectionGroups = groups.filter((group) => group.headingIndex !== null);
   const sectionPresets = language === 'zh'
@@ -90,6 +94,9 @@ export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange
     onChange(next, 'checkpoint');
   }
   function addEntry(group: Group) {
+    const groupIndex = groups.indexOf(group);
+    setActiveGroup(groupIndex);
+    setActiveEntries((value) => ({ ...value, [groupIndex]: entryCards(group, blocks).length }));
     const insertAt = group.indices.length ? group.indices.at(-1)! + 1 : (group.headingIndex ?? -1) + 1;
     const next = [...blocks];
     const entryBlocks: ReviewBlock[] = [{ kind: 'entry', text: '' }];
@@ -153,6 +160,7 @@ export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange
     onChange(blocks.filter((_, index) => index < start || index >= end), 'checkpoint');
   }
   function addSection(title: string) {
+    setActiveGroup(groups.length);
     const isEntrySection = ENTRY_SECTION.test(title);
     const next: ReviewBlock[] = [{ kind: 'section', text: title }];
     if (isEntrySection) {
@@ -165,11 +173,12 @@ export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange
 
   return <div className="structured-editor">
     <div className="structured-editor-intro"><div><strong>{language === 'zh' ? '按模块编辑' : 'Edit by section'}</strong><p>{language === 'zh' ? '每个模块可以包含多段经历；每段经历再添加自己的职责和成果。' : 'Each section can contain multiple entries, each with its own responsibilities and outcomes.'}</p><small>{t.saved}</small></div><div className="review-history-controls"><button type="button" disabled={!canUndo} onClick={onUndo}>← {t.undo}</button><button type="button" disabled={!canRedo} onClick={onRedo}>{t.redo} →</button></div></div>
+    <nav className="review-section-nav" aria-label={language === 'zh' ? '简历模块' : 'Resume sections'}>{groups.map((group, index) => <a key={index} href={`#resume-editor-section-${index}`} aria-current={activeGroup === index ? 'location' : undefined} onClick={(event) => { event.preventDefault(); setActiveGroup(index); window.setTimeout(() => { const section = document.getElementById(`resume-editor-section-${index}`); section?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' }); section?.focus({ preventScroll: true }); }, 0); }}>{group.title}</a>)}</nav>
     {groups.map((group, groupIndex) => {
       const isEntryGroup = group.headingIndex !== null && (ENTRY_SECTION.test(group.title) || group.indices.some((index) => blocks[index].kind === 'entry'));
       const cards = isEntryGroup ? entryCards(group, blocks) : [];
-      return <details className="resume-editor-group" key={groupIndex} open={groupIndex < 3}>
-        <summary><span>{group.title}</span><small>{isEntryGroup ? cards.length : group.indices.length}</small></summary>
+      return <details className="resume-editor-group" id={`resume-editor-section-${groupIndex}`} tabIndex={-1} key={groupIndex} open={activeGroup === groupIndex}>
+        <summary onClick={(event) => { event.preventDefault(); setActiveGroup(activeGroup === groupIndex ? null : groupIndex); }}><span>{group.title}</span><small>{isEntryGroup ? cards.length : group.indices.length}</small></summary>
         <div className="resume-editor-fields">
           {group.headingIndex !== null && <><label className="resume-editor-section-name"><span>{fieldLabel('section', language)}</span><input value={blocks[group.headingIndex].text.replace(/[:：]$/, '')} onChange={(event) => update(group.headingIndex!, event.target.value)} /></label><div className="resume-editor-section-actions"><button type="button" disabled={sectionGroups[0]?.headingIndex === group.headingIndex} onClick={() => moveSection(group, -1)}>↑ {t.up}</button><button type="button" disabled={sectionGroups.at(-1)?.headingIndex === group.headingIndex} onClick={() => moveSection(group, 1)}>↓ {t.down}</button><button type="button" className="is-danger" onClick={() => deleteSection(group)}>{t.removeSection}</button></div></>}
           {isEntryGroup ? <>
@@ -177,21 +186,22 @@ export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange
               const fields = blocks[card.entryIndex].fields ?? parseEntryFields(blocks[card.entryIndex].text);
               const organizationLabel = EDUCATION_SECTION.test(group.title) ? t.school : PROJECT_SECTION.test(group.title) ? t.project : t.company;
               const roleLabel = EDUCATION_SECTION.test(group.title) ? t.degree : PROJECT_SECTION.test(group.title) ? t.projectRole : t.role;
-              return <article className="experience-editor-card" key={`${card.entryIndex}-${cardIndex}`}>
-                <header><strong>{fields.organization || `${group.title} ${cardIndex + 1}`}</strong><div><button type="button" disabled={cardIndex === 0} onClick={() => moveEntry(cards, cardIndex, -1)} aria-label={t.up}>↑</button><button type="button" disabled={cardIndex === cards.length - 1} onClick={() => moveEntry(cards, cardIndex, 1)} aria-label={t.down}>↓</button><button type="button" onClick={() => duplicateEntry(cards, cardIndex)}>{t.duplicate}</button><button type="button" onClick={() => removeEntry(cards, cardIndex)}>{t.remove}</button></div></header>
+              return <details className="experience-editor-card" key={`${card.entryIndex}-${cardIndex}`} open={(activeEntries[groupIndex] ?? 0) === cardIndex}>
+                <summary onClick={(event) => { event.preventDefault(); setActiveEntries((value) => ({ ...value, [groupIndex]: (value[groupIndex] ?? 0) === cardIndex ? -1 : cardIndex })); }}><strong>{fields.organization || `${group.title} ${cardIndex + 1}`}</strong><small>{fields.role || (language === 'zh' ? '填写职位与经历' : 'Add role and experience')}</small></summary>
+                <header><strong>{fields.organization || `${group.title} ${cardIndex + 1}`}</strong><div><button type="button" disabled={cardIndex === 0} onClick={() => moveEntry(cards, cardIndex, -1)} aria-label={language === 'zh' ? `上移${group.title}中的第 ${cardIndex + 1} 条内容` : `Move ${group.title} experience ${cardIndex + 1} up`}>↑</button><button type="button" disabled={cardIndex === cards.length - 1} onClick={() => moveEntry(cards, cardIndex, 1)} aria-label={language === 'zh' ? `下移${group.title}中的第 ${cardIndex + 1} 条内容` : `Move ${group.title} experience ${cardIndex + 1} down`}>↓</button><button type="button" onClick={() => duplicateEntry(cards, cardIndex)}>{t.duplicate}</button><button type="button" onClick={() => removeEntry(cards, cardIndex)}>{t.remove}</button></div></header>
                 <div className="experience-editor-meta"><label><span>{organizationLabel}</span><input value={fields.organization} onChange={(event) => updateEntry(card.entryIndex, 'organization', event.target.value)} /></label><label><span>{roleLabel}</span><input value={fields.role} onChange={(event) => updateEntry(card.entryIndex, 'role', event.target.value)} /></label><label><span>{t.date}</span><input value={fields.date} onChange={(event) => updateEntry(card.entryIndex, 'date', event.target.value)} placeholder={language === 'zh' ? '2023.06 - 至今' : '2023.06 - Present'} /></label></div>
                 <div className="experience-editor-outcomes">
-                  {card.contentIndices.map((index, position) => <div className="resume-editor-field is-bullet" key={`${index}-${position}`}><label><span>{fieldLabel(blocks[index].kind, language)}</span><textarea rows={2} value={blocks[index].text.replace(REVIEW_BULLET_PREFIX, '')} onChange={(event) => update(index, `• ${event.target.value}`)} /></label><div className="resume-editor-field-actions"><button type="button" aria-label={t.up} disabled={position === 0} onClick={() => moveLine(index, -1)}>↑</button><button type="button" aria-label={t.down} disabled={position === card.contentIndices.length - 1} onClick={() => moveLine(index, 1)}>↓</button><button type="button" onClick={() => remove(index)}>{t.remove}</button></div></div>)}
+                  {card.contentIndices.map((index, position) => <div className="resume-editor-field is-bullet" key={`${index}-${position}`}><label><span>{fieldLabel(blocks[index].kind, language)}</span><textarea rows={2} value={blocks[index].text.replace(REVIEW_BULLET_PREFIX, '')} onChange={(event) => update(index, `• ${event.target.value}`)} /></label><div className="resume-editor-field-actions"><button type="button" aria-label={language === 'zh' ? `上移${group.title}中的第 ${position + 1} 条内容` : `Move ${group.title} item ${position + 1} up`} disabled={position === 0} onClick={() => moveLine(index, -1)}>↑</button><button type="button" aria-label={language === 'zh' ? `下移${group.title}中的第 ${position + 1} 条内容` : `Move ${group.title} item ${position + 1} down`} disabled={position === card.contentIndices.length - 1} onClick={() => moveLine(index, 1)}>↓</button><button type="button" onClick={() => remove(index)}>{t.remove}</button></div></div>)}
                   <button type="button" className="resume-editor-add is-outcome" onClick={() => addOutcome(card)}>＋ {t.addOutcome}</button>
                 </div>
-              </article>;
+              </details>;
             }) : <p className="resume-editor-empty">{t.empty}</p>}
             <button type="button" className="resume-editor-add is-entry" onClick={() => addEntry(group)}>＋ {t.addEntry}</button>
           </> : <>
             {group.indices.length ? group.indices.map((index, position) => {
               const block = blocks[index];
               const multiline = block.kind === 'bullet' || block.kind === 'body';
-              return <div className={`resume-editor-field is-${block.kind}`} key={`${index}-${block.kind}`}><label><span>{fieldLabel(block.kind, language)}</span>{multiline ? <textarea rows={2} value={block.text.replace(REVIEW_BULLET_PREFIX, '')} onChange={(event) => update(index, block.kind === 'bullet' ? `• ${event.target.value}` : event.target.value)} /> : <input value={block.text} onChange={(event) => update(index, event.target.value)} />}</label><div className="resume-editor-field-actions"><button type="button" aria-label={t.up} disabled={position === 0} onClick={() => moveLine(index, -1)}>↑</button><button type="button" aria-label={t.down} disabled={position === group.indices.length - 1} onClick={() => moveLine(index, 1)}>↓</button><button type="button" onClick={() => remove(index)}>{t.remove}</button></div></div>;
+              return <div className={`resume-editor-field is-${block.kind}`} key={`${index}-${block.kind}`}><label><span>{fieldLabel(block.kind, language)}</span>{multiline ? <textarea rows={2} value={block.text.replace(REVIEW_BULLET_PREFIX, '')} onChange={(event) => update(index, block.kind === 'bullet' ? `• ${event.target.value}` : event.target.value)} /> : <input value={block.text} onChange={(event) => update(index, event.target.value)} />}</label><div className="resume-editor-field-actions"><button type="button" aria-label={language === 'zh' ? `上移${group.title}中的第 ${position + 1} 条内容` : `Move ${group.title} item ${position + 1} up`} disabled={position === 0} onClick={() => moveLine(index, -1)}>↑</button><button type="button" aria-label={language === 'zh' ? `下移${group.title}中的第 ${position + 1} 条内容` : `Move ${group.title} item ${position + 1} down`} disabled={position === group.indices.length - 1} onClick={() => moveLine(index, 1)}>↓</button><button type="button" onClick={() => remove(index)}>{t.remove}</button></div></div>;
             }) : <p className="resume-editor-empty">{t.empty}</p>}
             <button type="button" className="resume-editor-add" onClick={() => addLine(group)}>＋ {t.addLine}</button>
           </>}
@@ -199,6 +209,6 @@ export function ResumeStructuredEditor({ blocks, language, onChange, onRawChange
       </details>;
     })}
     <details className="resume-section-library"><summary>＋ {t.addSection}</summary><div><p>{t.addSectionHint}</p><div>{sectionPresets.map((title) => { const exists = title !== (language === 'zh' ? '自定义模块' : 'Custom Section') && sectionGroups.some((group) => group.title.toLowerCase() === title.toLowerCase()); return <button type="button" key={title} disabled={exists} onClick={() => addSection(title)}><span>{title}</span>{exists && <small>{t.added}</small>}</button>; })}</div></div></details>
-    <details className="raw-resume-editor"><summary>{t.raw}</summary><div><p>{t.rawHint}</p><textarea rows={18} value={rawValue} onChange={(event) => onRawChange(event.target.value)} /></div></details>
+    <details className="raw-resume-editor"><summary>{t.raw}</summary><div><p>{t.rawHint}</p><textarea aria-label={language === 'zh' ? '完整简历原始文字' : 'Full resume raw text'} rows={18} value={rawValue} onChange={(event) => onRawChange(event.target.value)} /></div></details>
   </div>;
 }

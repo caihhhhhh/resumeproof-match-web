@@ -7,6 +7,7 @@ import { OptimizationReview, SuggestionDecision } from '../../components/optimiz
 import { ResumeDocument, ResumeTemplate, ReviewBlock } from '../../components/resume-document';
 import { standaloneResumeHtml, resumeDocxBlob } from '../../lib/resume-export';
 import { ResumeStructuredEditor } from '../../components/resume-structured-editor';
+import { ResumePdfPreview } from '../../components/resume-pdf-preview';
 import { SiteFooter } from '../../components/site-footer';
 import { useLanguage } from '../../components/language-context';
 import { getDemoMaterials } from '../../lib/demo-materials';
@@ -14,6 +15,8 @@ import { auditFactChanges, FactChangeCategory } from '../../lib/fact-audit';
 import { EvidenceStatus, HardRequirementStatus, isMatchAnalysis, MatchAnalysis } from '../../lib/match-analysis';
 import { identifyJobSource, sourceLabels } from '../../lib/job-source';
 import { beginMatch, fileSizeBucket, trackEvent } from '../../lib/analytics';
+import { scrollToWorkspaceTop as scrollToTop } from '../../lib/scroll';
+import '../../components/flow-controls.css';
 
 type Screen = 'materials' | 'results' | 'review';
 type InputMode = 'upload' | 'paste';
@@ -40,6 +43,9 @@ type StoredDraft = {
   jobCompany: string;
   jobLocation: string;
   analysis?: MatchAnalysis;
+  analysisResume?: string;
+  analysisJd?: string;
+  isDemo?: boolean;
   suggestionDecisions?: Record<string, SuggestionDecision>;
   suggestionNotes?: Record<string, string>;
   reviewDraft?: string;
@@ -72,7 +78,7 @@ const copy = {
     jdUpload: '上传 JD 文件或截图', jdUploadHint: 'PDF、DOCX、TXT、MD、PNG、JPG 或 WebP', jdUploaded: 'JD 内容已读取，请核对文字。', jdReading: '正在读取 JD…',
     parseLink: '读取职位链接', parsingLink: '正在读取…', detected: '已识别来源', linkParsed: '职位内容已读取，请检查原文。', pasteRequired: '该页面无法可靠自动读取，请把完整 JD 粘贴到输入框。', detailLinkRequired: '请粘贴具体职位详情页链接，而不是搜索结果或职位列表页。',
     invalidUrl: '请输入有效的 HTTPS 招聘链接。', reviewJd: '查看或编辑读取到的 JD 文字', characters: '字符', start: '开始 AI 分析', confirmAndAnalyze: '确认识别文字并分析', analyzing: 'AI 正在分析…', startHint: '点击后，已核对的简历与 JD 文字将发送给 DeepSeek 做语义分析；图片或扫描 PDF 仅在识别时发送给智谱。', sampleConsent: '允许保存自动脱敏后的简历与 JD 30 天，用于改进匹配质量（可选）', samplePrivacy: '了解数据处理', sampleSaved: '脱敏样本已保存 30 天', sampleDelete: '立即删除', sampleDeleted: '样本已删除',
-    aiNotConfigured: '分析服务尚未配置，请联系网站管理员。', aiFailed: '分析服务暂时不可用，请稍后重试。', aiAuth: '分析服务授权异常，请联系网站管理员。', aiBalance: '分析服务额度不足，请联系网站管理员。', aiRate: '分析服务请求过于频繁，请稍后重试。', siteRate: '当前设备请求较频繁，请稍后再试。', aiOutput: '完整报告未生成成功，请重新分析。系统不会展示缺少评分、证据或建议的半成品。', aiTimeout: '分析超过 60 秒仍未响应，请重新分析。',
+    aiNotConfigured: '分析服务尚未配置，请联系网站管理员。', aiFailed: '分析服务暂时不可用，请稍后重试。', aiAuth: '分析服务授权异常，请联系网站管理员。', aiBalance: '分析服务额度不足，请联系网站管理员。', aiRate: '分析服务请求过于频繁，请稍后重试。', siteRate: '当前设备请求较频繁，请稍后再试。', aiOutput: '完整报告未生成成功，请重新分析。系统不会展示缺少评分、证据或建议的半成品。', aiTimeout: '本次分析等待超时，材料和之前的审核稿已保留。请重试。',
     resultBack: '返回修改材料', matchTitle: '证据先于分数。', matchBody: 'AI 会识别同义表达和可迁移经验，但每项匹配都必须引用真实的简历原句。结果不代表招聘决定。',
     decisionLabel: '投递建议', decisionApply: '可以直接投递', decisionReview: '确认后再投递', decisionSkip: '暂不建议投递', decisionApplyNote: '硬条件已核对，核心能力有充分证据。', decisionReviewNote: '存在尚未确认的硬条件或需要补强的核心证据。', decisionSkipNote: '存在明确硬条件冲突或关键能力证据不足。', scoreLabel: '证据匹配度', gradeA: '值得投递', gradeB: '有条件投递', gradeC: '证据不足', scoreMethod: '系统先核对硬条件，再按 3、2、1 权重计算必须项、重要项和加分项；分数只作为辅助，不会覆盖未确认或不满足的硬条件。', mustCoverage: '必须项覆盖', importantCoverage: '重要项覆盖', bonusCoverage: '加分项覆盖', verifiedCoverage: '引用覆盖率', mustNote: '对最终判断影响最大', importantNote: '影响岗位胜任度', bonusNote: '不满足通常不构成淘汰', verifiedNote: '分析要求中附有原句的比例，不代表语义核验通过率',
     hardTitle: '先核对硬条件', hardBody: '地点、身份、学历、年限、语言和行业门槛不会被综合分数掩盖。', hardEmpty: 'JD 中没有识别到明确的硬性门槛。', hardMet: '已满足', hardUnverified: '待确认', hardNotMet: '不满足', hardEvidence: '核对原句',
@@ -83,8 +89,8 @@ const copy = {
     feedbackTitle: '这份分析对你有帮助吗？', feedbackBody: '只记录选择，不记录简历或 JD 内容。', feedbackYes: '有帮助', feedbackNo: '不太准', feedbackWhy: '主要问题是', feedbackThanks: '收到，感谢你的反馈。', feedbackError: '暂时无法提交，请稍后再试。', feedbackScore: '评分不合理', feedbackEvidence: '漏掉已有经历', feedbackSuggestions: '建议不实用', feedbackUnclear: '解释不清楚', feedbackOther: '其他',
     reviewEyebrow: '完整文字审核稿', reviewTitle: '编辑与导出', reviewBody: '这里只合并你明确采用的建议。核对全文并选择版式后，可直接确认并保存 PDF 或 DOCX。', reviewChanges: '本轮已采用修改', reviewOriginal: '原文', reviewFinal: '审核稿', reviewCharacters: '字符', reviewWarning: '导出前请重点核对公司、职位、日期、数字和专有名词。', reviewBack: '返回建议审核', reviewNext: '确认文字稿', reviewPreview: '排版预览', reviewEdit: '编辑文字', reviewPreviewHint: '预览只调整视觉层级与空白，不改变审核稿内容。', reviewNoChanges: '本轮没有采用 AI 改写，当前显示原始简历全文。', reviewCanvas: '文字排版预览', reviewPage: '页', reviewPagesApprox: '预计', reviewIncomplete: '项待填写', reviewLong: '内容可能超过两页，建议切换紧凑版或精简次要信息。',
     confirmedEyebrow: '文字审核已完成', confirmedTitle: '这份文字稿已锁定。', confirmedBody: '系统保存了当前全文快照。返回修改任何文字后，本次确认会自动失效；此操作不会生成 HTML、PDF 或其他文件。', confirmedSnapshot: '已确认全文', confirmedChanges: '采用修改', confirmedTime: '确认时间', confirmedEdit: '返回继续编辑', confirmedNext: '选择简历模板', confirmedNextHint: '先选择版式，不会立即生成文件。',
-    templateEyebrow: '选择版式', templateTitle: '内容不变，只调整阅读节奏。', templateBody: '三个模板共用已确认文字。切换模板不会重写内容，也不会影响匹配报告。', templateBalanced: '经典单栏', templateBalancedBody: '沿用 Will 的简历骨架：蓝灰标题、清晰时间轴与舒适行距。', templateCompact: '紧凑单栏', templateCompactBody: '保持同一视觉体系，压缩段间距以容纳更长经历。', templateMinimal: '极简单栏', templateMinimalBody: '保留版式节奏，降低色彩强调，让成果更突出。', templateSelected: '已选择', templateBack: '返回确认记录', templateContinue: '进入最终预览',
-    exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '确认并下载 PDF', exportDocx: '下载 DOCX', exportMore: '更多格式', exportAnother: '用当前简历匹配新岗位', exportPrintHint: '确认全文后下载。PDF 为实际 A4 分页；网页页数仅供参考，DOCX 可继续编辑。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成', pdfCheckTitle: '导出格式说明', pdfCheckBody: 'A4 单栏、固定页边距、可选择文字、受控分页；中文简历按需嵌入字体。', pdfGenerating: '正在生成 PDF…', pdfError: 'PDF 生成失败，请检查网络后重试，或先下载 DOCX。',
+    templateEyebrow: '选择版式', templateTitle: '内容不变，只调整阅读节奏。', templateBody: '三个模板共用已确认文字。切换模板不会重写内容，也不会影响匹配报告。', templateBalanced: '经典单栏', templateBalancedBody: '蓝灰标题、清晰时间轴与舒适行距。', templateCompact: '紧凑单栏', templateCompactBody: '保持同一视觉体系，压缩段间距以容纳更长经历。', templateMinimal: '极简单栏', templateMinimalBody: '保留版式节奏，降低色彩强调，让成果更突出。', templateSelected: '已选择', templateBack: '返回确认记录', templateContinue: '进入最终预览',
+    exportEyebrow: '最终预览', exportTitle: '下载前，再看一遍成品。', exportBody: '这里展示最终版式。', exportBack: '返回选择模板', exportDownload: '下载 HTML', exportPrint: '确认并下载 PDF', exportDocx: '下载 DOCX', exportMore: '更多格式', exportAnother: '用当前简历匹配新岗位', exportPrintHint: '确认全文后下载。PDF 为实际 A4 分页；网页页数仅供参考，DOCX 可继续编辑。', exportTemplate: '当前模板', exportReady: '文字与版式已准备完成', pdfCheckTitle: '导出格式说明', pdfCheckBody: 'A4 单栏、固定页边距、可选择文字、受控分页；从本站加载并嵌入字体，与网页预览使用同一套字体。', pdfGenerating: '正在生成 PDF…', pdfError: 'PDF 生成失败，请检查网络后重试，或先下载 DOCX。',
     demoAction: '使用示例材料完整体验', demoLoaded: '示例材料与完整报告已载入', saveBaseResume: '保存为本机基础简历', updateBaseResume: '更新本机基础简历', useBaseResume: '使用已保存版本', baseResumeSaved: '本机基础版本已保存', clearBaseResume: '清除本机版本', baseResumeHint: '只保存在这台设备的浏览器中，不会上传；清除浏览器数据后会消失。',
   },
   en: {
@@ -99,7 +105,7 @@ const copy = {
     jdUpload: 'Upload a JD file or screenshot', jdUploadHint: 'PDF, DOCX, TXT, MD, PNG, JPG, or WebP', jdUploaded: 'JD content extracted. Review the text.', jdReading: 'Reading the JD…',
     parseLink: 'Read job link', parsingLink: 'Reading…', detected: 'Detected source', linkParsed: 'Job content extracted. Review the source text.', pasteRequired: 'This page cannot be read reliably. Paste the complete JD into the field.', detailLinkRequired: 'Paste a specific job-detail URL rather than a search or job-listing page.',
     invalidUrl: 'Enter a valid HTTPS job posting URL.', reviewJd: 'Review or edit the extracted JD text', characters: 'characters', start: 'Start AI analysis', confirmAndAnalyze: 'Confirm extracted text and analyze', analyzing: 'AI is analyzing…', startHint: 'After you click, reviewed resume and JD text is sent to DeepSeek for semantic analysis. Images or scanned PDFs are sent to Zhipu only for recognition.', sampleConsent: 'Save an automatically redacted resume and JD for 30 days to improve matching (optional)', samplePrivacy: 'How data is handled', sampleSaved: 'Redacted sample saved for 30 days', sampleDelete: 'Delete now', sampleDeleted: 'Sample deleted',
-    aiNotConfigured: 'The analysis service is not configured. Contact the site administrator.', aiFailed: 'The analysis service is temporarily unavailable. Please try again.', aiAuth: 'The analysis service has an authorization issue. Contact the site administrator.', aiBalance: 'The analysis service has insufficient quota. Contact the site administrator.', aiRate: 'The analysis service is rate-limiting requests. Try again shortly.', siteRate: 'This device has made too many requests. Please try again shortly.', aiOutput: 'The complete report could not be generated. Please retry; incomplete scores, evidence, or suggestions will never be shown.', aiTimeout: 'Analysis did not finish within 60 seconds. Please run it again.',
+    aiNotConfigured: 'The analysis service is not configured. Contact the site administrator.', aiFailed: 'The analysis service is temporarily unavailable. Please try again.', aiAuth: 'The analysis service has an authorization issue. Contact the site administrator.', aiBalance: 'The analysis service has insufficient quota. Contact the site administrator.', aiRate: 'The analysis service is rate-limiting requests. Try again shortly.', siteRate: 'This device has made too many requests. Please try again shortly.', aiOutput: 'The complete report could not be generated. Please retry; incomplete scores, evidence, or suggestions will never be shown.', aiTimeout: 'Analysis timed out. Your materials and previous draft are safe. Please retry.',
     resultBack: 'Back to materials', matchTitle: 'Evidence before scores.', matchBody: 'AI can recognize equivalent wording and transferable experience, but every match must cite a real resume excerpt. Results are not hiring decisions.',
     decisionLabel: 'Application recommendation', decisionApply: 'Apply now', decisionReview: 'Confirm before applying', decisionSkip: 'Do not apply yet', decisionApplyNote: 'Eligibility gates are verified and core capabilities have strong evidence.', decisionReviewNote: 'An eligibility gate is still unverified or a core capability needs stronger evidence.', decisionSkipNote: 'There is an explicit eligibility conflict or a critical evidence gap.', scoreLabel: 'Evidence match', gradeA: 'Pursue', gradeB: 'Conditional fit', gradeC: 'Evidence gap', scoreMethod: 'Eligibility gates are checked first. Must-have, important, and bonus capabilities then use 3:2:1 weights; the score cannot override an unverified or unmet gate.', mustCoverage: 'Must-have coverage', importantCoverage: 'Important coverage', bonusCoverage: 'Bonus coverage', verifiedCoverage: 'Citation coverage', mustNote: 'Largest impact on the final score', importantNote: 'Material to role readiness', bonusNote: 'Usually not disqualifying', verifiedNote: 'Share of requirements with source excerpts; not a semantic accuracy score',
     hardTitle: 'Verify eligibility gates first', hardBody: 'Location, authorization, education, experience, language, and industry gates cannot be hidden by an overall score.', hardEmpty: 'No explicit eligibility gate was found in this JD.', hardMet: 'Verified', hardUnverified: 'Confirm', hardNotMet: 'Not met', hardEvidence: 'Source evidence',
@@ -110,8 +116,8 @@ const copy = {
     feedbackTitle: 'Was this analysis useful?', feedbackBody: 'Only your selection is stored. Resume and JD content are not included.', feedbackYes: 'Useful', feedbackNo: 'Not accurate', feedbackWhy: 'Main issue', feedbackThanks: 'Thanks, your feedback was received.', feedbackError: 'Feedback could not be submitted. Try again later.', feedbackScore: 'Score feels wrong', feedbackEvidence: 'Missed existing evidence', feedbackSuggestions: 'Suggestions are weak', feedbackUnclear: 'Explanation is unclear', feedbackOther: 'Other',
     reviewEyebrow: 'Full text review', reviewTitle: 'Edit and export', reviewBody: 'Only suggestions you explicitly adopted are merged here. Verify the full draft, choose a layout, then confirm and save PDF or DOCX.', reviewChanges: 'Adopted changes', reviewOriginal: 'Original', reviewFinal: 'Review draft', reviewCharacters: 'characters', reviewWarning: 'Before export, verify company names, titles, dates, metrics, and proper nouns.', reviewBack: 'Back to suggestions', reviewNext: 'Confirm draft', reviewPreview: 'Layout preview', reviewEdit: 'Edit text', reviewPreviewHint: 'The preview changes hierarchy and spacing only. Draft content stays unchanged.', reviewNoChanges: 'No AI rewrite was adopted. The original resume is shown in full.', reviewCanvas: 'Text layout preview', reviewPage: 'page', reviewPagesApprox: 'About', reviewIncomplete: 'fields to complete', reviewLong: 'This may run beyond two pages. Try the compact layout or trim lower-priority details.',
     confirmedEyebrow: 'Text review complete', confirmedTitle: 'This draft is now locked.', confirmedBody: 'The complete text snapshot has been saved. Editing any text will invalidate this confirmation. No HTML, PDF, or other file is created here.', confirmedSnapshot: 'Confirmed text', confirmedChanges: 'adopted changes', confirmedTime: 'Confirmed at', confirmedEdit: 'Return to edit', confirmedNext: 'Choose a template', confirmedNextHint: 'Choose the layout first. No file is generated yet.',
-    templateEyebrow: 'Choose a layout', templateTitle: 'Keep the content. Change the reading rhythm.', templateBody: 'All three templates use the confirmed text. Switching layouts does not rewrite the resume or change the match report.', templateBalanced: 'Classic', templateBalancedBody: "Will's resume structure with blue-grey hierarchy, a clear timeline, and comfortable spacing.", templateCompact: 'Compact', templateCompactBody: 'The same visual system with tighter spacing for longer experience.', templateMinimal: 'Minimal', templateMinimalBody: 'The same reading rhythm with quieter color and more focus on outcomes.', templateSelected: 'Selected', templateBack: 'Back to confirmation', templateContinue: 'Open final preview',
-    exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Confirm and download PDF', exportDocx: 'Download DOCX', exportMore: 'More formats', exportAnother: 'Match this resume to another job', exportPrintHint: 'Confirm the full text before downloading. PDF uses A4 pagination; web page counts are approximate. DOCX is editable.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready', pdfCheckTitle: 'Export format', pdfCheckBody: 'A4 single column, fixed margins, selectable text, and controlled pagination. CJK fonts load only when needed.', pdfGenerating: 'Generating PDF…', pdfError: 'PDF generation failed. Check your connection and retry, or download DOCX.',
+    templateEyebrow: 'Choose a layout', templateTitle: 'Keep the content. Change the reading rhythm.', templateBody: 'All three templates use the confirmed text. Switching layouts does not rewrite the resume or change the match report.', templateBalanced: 'Classic', templateBalancedBody: "Blue-grey hierarchy, a clear timeline, and comfortable spacing.", templateCompact: 'Compact', templateCompactBody: 'The same visual system with tighter spacing for longer experience.', templateMinimal: 'Minimal', templateMinimalBody: 'The same reading rhythm with quieter color and more focus on outcomes.', templateSelected: 'Selected', templateBack: 'Back to confirmation', templateContinue: 'Open final preview',
+    exportEyebrow: 'Final preview', exportTitle: 'One last look before download.', exportBody: 'This is the final layout.', exportBack: 'Back to templates', exportDownload: 'Download HTML', exportPrint: 'Confirm and download PDF', exportDocx: 'Download DOCX', exportMore: 'More formats', exportAnother: 'Match this resume to another job', exportPrintHint: 'Confirm the full text before downloading. PDF uses A4 pagination; web page counts are approximate. DOCX is editable.', exportTemplate: 'Current template', exportReady: 'Text and layout are ready', pdfCheckTitle: 'Export format', pdfCheckBody: 'A4 single column, fixed margins, selectable text, and controlled pagination. Fonts load from this site and are embedded using the same family as the web preview.', pdfGenerating: 'Generating PDF…', pdfError: 'PDF generation failed. Check your connection and retry, or download DOCX.',
     demoAction: 'Try the complete example', demoLoaded: 'Example materials and full report loaded', saveBaseResume: 'Save as local base resume', updateBaseResume: 'Update local base resume', useBaseResume: 'Use saved version', baseResumeSaved: 'Local base version saved', clearBaseResume: 'Clear local version', baseResumeHint: 'Stored only in this browser on this device. It is not uploaded and disappears if browser data is cleared.',
   },
 } as const;
@@ -301,6 +307,10 @@ export default function NewMatchPage() {
   const [jobCompany, setJobCompany] = useState('');
   const [jobLocation, setJobLocation] = useState('');
   const [analysis, setAnalysis] = useState<MatchAnalysis | null>(null);
+  const [analysisResume, setAnalysisResume] = useState('');
+  const [analysisJd, setAnalysisJd] = useState('');
+  const [isDemo, setIsDemo] = useState(false);
+  const [evidenceHint, setEvidenceHint] = useState('');
   const [analysisState, setAnalysisState] = useState<'idle' | 'working' | 'error'>('idle');
   const [analysisError, setAnalysisError] = useState('');
   const [analysisSeconds, setAnalysisSeconds] = useState(0);
@@ -323,6 +333,10 @@ export default function NewMatchPage() {
   const [feedbackIntent, setFeedbackIntent] = useState<'idle' | 'negative'>('idle');
   const [feedbackState, setFeedbackState] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
   const [pdfExportState, setPdfExportState] = useState<'idle' | 'working' | 'error'>('idle');
+  const [docxExportState, setDocxExportState] = useState<'idle' | 'working' | 'error'>('idle');
+  const [pdfPreview, setPdfPreview] = useState<{ key: string; url: string; blob: Blob } | null>(null);
+  const pdfCache = useRef<{ key: string; blob: Blob; url: string } | null>(null);
+  const pdfGeneration = useRef(0);
   const [previewPages, setPreviewPages] = useState(1);
   const [reviewView, setReviewView] = useState<'edit' | 'preview'>('edit');
   const [baseMessage, setBaseMessage] = useState('');
@@ -334,6 +348,10 @@ export default function NewMatchPage() {
   const previewMeasureRef = useRef<HTMLDivElement>(null);
   const demoAutoLoadedRef = useRef(false);
   const exportReadyTrackedRef = useRef(false);
+  const analysisRequestRef = useRef<AbortController | null>(null);
+  const resumeReadVersion = useRef(0);
+  const jdReadVersion = useRef(0);
+  const resumeTextRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -383,13 +401,17 @@ export default function NewMatchPage() {
           setJobLocation(typeof draft.jobLocation === 'string' ? draft.jobLocation : '');
           if (isMatchAnalysis(draft.analysis)) {
             setAnalysis(draft.analysis);
+            setAnalysisResume(draft.analysisResume ?? savedResumeText);
+            setAnalysisJd(draft.analysisJd ?? savedJdText);
+            setIsDemo(draft.isDemo === true);
+            demoAutoLoadedRef.current = true;
             if (draft.suggestionDecisions && typeof draft.suggestionDecisions === 'object') setSuggestionDecisions(draft.suggestionDecisions);
             if (draft.suggestionNotes && typeof draft.suggestionNotes === 'object') setSuggestionNotes(draft.suggestionNotes);
             if (typeof draft.reviewDraft === 'string') {
               setReviewDraft(draft.reviewDraft);
               setGeneratedReview(typeof draft.generatedReview === 'string' ? draft.generatedReview : '');
               setReviewBlocks(isReviewBlockArray(draft.reviewBlocks) ? draft.reviewBlocks : parseReviewBlocks(draft.reviewDraft));
-              setReviewBaseline(savedResumeText);
+              setReviewBaseline(typeof draft.reviewBaseline === 'string' ? draft.reviewBaseline : savedResumeText);
               if (draft.factConfirmations && typeof draft.factConfirmations === 'object') setFactConfirmations(draft.factConfirmations);
             }
             if (typeof draft.confirmedDraft === 'string') setConfirmedDraft(draft.confirmedDraft);
@@ -402,8 +424,7 @@ export default function NewMatchPage() {
           }
         }
       } catch {
-        window.sessionStorage.removeItem('resumematch-current-draft');
-        window.localStorage.removeItem('resumematch-current-draft');
+        try { window.sessionStorage.removeItem('resumematch-current-draft'); window.localStorage.removeItem('resumematch-current-draft'); } catch { /* Storage may be blocked. */ }
       } finally { setDraftRestored(true); }
     }, 0);
     return () => window.clearTimeout(timer);
@@ -411,9 +432,19 @@ export default function NewMatchPage() {
 
   useEffect(() => {
     if (!draftRestored) return;
-    const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, suggestionDecisions, suggestionNotes, reviewDraft, reviewBaseline, generatedReview, reviewBlocks, factConfirmations, confirmedDraft, confirmedAt, selectedTemplate, sampleReference };
+    const draft: StoredDraft = { screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis: analysis ?? undefined, analysisResume, analysisJd, isDemo, suggestionDecisions, suggestionNotes, reviewDraft, reviewBaseline, generatedReview, reviewBlocks, factConfirmations, confirmedDraft, confirmedAt, selectedTemplate, sampleReference };
     try { window.sessionStorage.setItem('resumematch-current-draft', JSON.stringify(draft)); } catch { /* Keep the current tab usable if browser storage is unavailable. */ }
-  }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, suggestionDecisions, suggestionNotes, reviewDraft, reviewBaseline, generatedReview, reviewBlocks, factConfirmations, confirmedDraft, confirmedAt, selectedTemplate, sampleReference]);
+  }, [draftRestored, screen, resumeMode, resumeText, jdEntry, jdText, jdSource, jobTitle, jobCompany, jobLocation, analysis, analysisResume, analysisJd, isDemo, suggestionDecisions, suggestionNotes, reviewDraft, reviewBaseline, generatedReview, reviewBlocks, factConfirmations, confirmedDraft, confirmedAt, selectedTemplate, sampleReference]);
+
+  useEffect(() => () => { analysisRequestRef.current?.abort(); resumeReadVersion.current += 1; jdReadVersion.current += 1; }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const heading = document.getElementById(screen === 'materials' ? 'workspace-title' : screen === 'results' ? 'match-workbench-title' : 'text-review-title');
+      heading?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [screen]);
 
   useEffect(() => {
     if (screen !== 'review') return;
@@ -439,7 +470,10 @@ export default function NewMatchPage() {
 
   const activateDemo = useCallback(() => {
     beginMatch(true);
+    analysisRequestRef.current?.abort();
+    resumeReadVersion.current += 1; jdReadVersion.current += 1;
     const demo = getDemoMaterials(language);
+    setAnalysisResume(demo.resume); setAnalysisJd(demo.jd); setIsDemo(true);
     setResumeMode('paste'); setResumeFile(null); setResumeName(''); setResumeText(demo.resume); setResumeNeedsReview(false); setResumeState('ready'); setResumeError('');
     setJdFile(null); setJdFileName(''); setJdEntry(demo.jd); setJdText(demo.jd); setJdSource(language === 'zh' ? '公开脱敏示例' : 'Public demo'); setJdState('ready'); setJdMessage('');
     setJobTitle(language === 'zh' ? '增长营销经理' : 'Growth Marketing Manager'); setJobCompany('Example Labs'); setJobLocation('');
@@ -447,7 +481,7 @@ export default function NewMatchPage() {
     resumeReadyTracked.current = true; jdReadyTracked.current = true; reviewUndoRef.current = []; reviewRedoRef.current = []; setCanUndoReview(false); setCanRedoReview(false);
     setScreen('results');
     trackEvent('demo_started', { language });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
   }, [language]);
 
   useEffect(() => {
@@ -463,18 +497,22 @@ export default function NewMatchPage() {
     if (!file) return;
     setResumeError('');
     if (!ACCEPTED_RESUME_EXTENSIONS.has(fileExtension(file.name))) {
-      setResumeFile(null); setResumeName(''); setResumeState('error'); setResumeError(t.unsupported); event.target.value = ''; return;
+      setResumeError(t.unsupported); event.target.value = ''; return;
     }
     if (file.size > 8 * 1024 * 1024) {
-      setResumeFile(null); setResumeName(''); setResumeState('error'); setResumeError(t.tooLarge); event.target.value = ''; return;
+      setResumeError(t.tooLarge); event.target.value = ''; return;
     }
-    setResumeFile(file); setResumeName(file.name); setResumeText(''); setResumeState('working'); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBaseline(''); setReviewBlocks([]); setFactConfirmations({}); setConfirmedDraft(''); setConfirmedAt(''); resumeReadyTracked.current = false;
+    const version = ++resumeReadVersion.current;
+    setResumeState('working');
+    event.target.value = '';
     trackEvent('resume_upload_started', { file_type: fileExtension(file.name), file_size: fileSizeBucket(file.size) });
     try {
       const localText = await readDocumentFile(file).catch(() => '');
       const usedOcr = localText.length < 80;
       const text = usedOcr ? await recognizeDocumentFile(file, language, 'resume') : localText;
-      setResumeText(text.length >= 80 ? text : '');
+      if (version !== resumeReadVersion.current) return;
+      if (text.length < 80) throw new Error('OCR_FAILED');
+      setResumeFile(file); setResumeName(file.name); setResumeText(text);
       setResumeNeedsReview(usedOcr && text.length >= 80);
       if (text.length >= 80) {
         setResumeState('ready');
@@ -486,8 +524,7 @@ export default function NewMatchPage() {
         trackEvent('resume_upload_failed', { reason: 'insufficient_text', extraction: usedOcr ? 'ocr' : 'local' });
       }
     } catch (error) {
-      setResumeText('');
-      setResumeNeedsReview(false);
+      if (version !== resumeReadVersion.current) return;
       const code = error instanceof Error ? error.message : 'OCR_FAILED';
       const message = code === 'OCR_NOT_CONFIGURED' ? t.ocrNotConfigured
         : code === 'OCR_AUTH' ? t.ocrAuth
@@ -497,7 +534,7 @@ export default function NewMatchPage() {
               : code === 'OCR_PAGE_LIMIT' ? t.ocrPageLimit
               : t.ocrFailed;
       setResumeError(message);
-      setResumeState('error');
+      setResumeState(resumeText.trim().length >= 80 ? 'ready' : 'error');
       trackEvent('resume_upload_failed', { reason: code.slice(0, 36), file_type: fileExtension(file.name) });
     }
   }
@@ -507,23 +544,27 @@ export default function NewMatchPage() {
     if (!file) return;
     const extension = fileExtension(file.name);
     if (!ACCEPTED_RESUME_EXTENSIONS.has(extension)) {
-      setJdFile(null); setJdFileName(''); setJdState('error'); setJdMessage(t.unsupported); event.target.value = ''; return;
+      setJdMessage(t.unsupported); event.target.value = ''; return;
     }
     if (file.size > 8 * 1024 * 1024) {
-      setJdFile(null); setJdFileName(''); setJdState('error'); setJdMessage(t.tooLarge); event.target.value = ''; return;
+      setJdMessage(t.tooLarge); event.target.value = ''; return;
     }
-    setJdFile(file); setJdFileName(file.name); setJdEntry(''); setJdText(''); setJdState('working'); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation(''); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBaseline(''); setReviewBlocks([]); setFactConfirmations({}); setConfirmedDraft(''); setConfirmedAt(''); jdReadyTracked.current = false;
+    const version = ++jdReadVersion.current;
+    setJdState('working'); setJdMessage(''); event.target.value = '';
     trackEvent('jd_file_upload_started', { file_type: extension, file_size: fileSizeBucket(file.size) });
     try {
       const localText = await readDocumentFile(file).catch(() => '');
       const usedOcr = localText.length < 80;
       const text = usedOcr ? await recognizeDocumentFile(file, language, 'jd') : localText;
+      if (version !== jdReadVersion.current) return;
       if (text.length < 80) throw new Error('OCR_FAILED');
+      setJdFile(file); setJdFileName(file.name); setJobTitle(''); setJobCompany(''); setJobLocation('');
       setJdEntry(text); setJdText(text); setJdState('ready'); setJdMessage(t.jdUploaded); setJdSource(language === 'zh' ? '上传文件' : 'Uploaded file');
       trackEvent('jd_file_upload_completed', { file_type: extension, extraction: usedOcr ? 'ocr' : 'local' });
       trackEvent('jd_input_ready', { method: usedOcr ? 'file_ocr' : 'file' });
       jdReadyTracked.current = true;
     } catch (error) {
+      if (version !== jdReadVersion.current) return;
       const code = error instanceof Error ? error.message : 'OCR_FAILED';
       const message = code === 'OCR_NOT_CONFIGURED' ? t.ocrNotConfigured
         : code === 'OCR_AUTH' ? t.ocrAuth
@@ -532,13 +573,14 @@ export default function NewMatchPage() {
               : code === 'OCR_TIMEOUT' || code === 'READ_TIMEOUT' ? t.ocrTimeout
                 : code === 'OCR_PAGE_LIMIT' ? t.ocrPageLimit
                   : t.ocrFailed;
-      setJdEntry(''); setJdText(''); setJdState('error'); setJdMessage(message);
+      setJdState(jdText.trim().length >= 80 ? 'ready' : 'error'); setJdMessage(message);
       trackEvent('jd_file_upload_failed', { reason: code.slice(0, 36), file_type: extension });
     }
   }
 
   function handleJdEntry(value: string) {
-    setJdFile(null); setJdFileName(''); setJdEntry(value); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation(''); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBaseline(''); setReviewBlocks([]); setFactConfirmations({}); setConfirmedDraft(''); setConfirmedAt('');
+    jdReadVersion.current += 1;
+    setJdFile(null); setJdFileName(''); setJdEntry(value); setJdMessage(''); setJdSource(''); setJobTitle(''); setJobCompany(''); setJobLocation('');
     if (/^https?:\/\//i.test(value.trim())) { setJdText(''); setJdState('idle'); jdReadyTracked.current = false; }
     else {
       const ready = value.trim().length >= 80;
@@ -549,7 +591,8 @@ export default function NewMatchPage() {
   }
 
   function changeResumeText(value: string) {
-    setResumeText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBaseline(''); setReviewBlocks([]); setFactConfirmations({}); setConfirmedDraft(''); setConfirmedAt('');
+    resumeReadVersion.current += 1;
+    setResumeText(value); setResumeState(value.trim().length >= 80 ? 'ready' : 'idle');
     const ready = value.trim().length >= 80;
     if (ready && !resumeReadyTracked.current) trackEvent('resume_input_ready', { method: resumeMode === 'paste' ? 'paste' : 'edit' });
     resumeReadyTracked.current = ready;
@@ -589,7 +632,8 @@ export default function NewMatchPage() {
   }
 
   function changeParsedJd(value: string) {
-    setJdText(value); setAnalysis(null); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBaseline(''); setReviewBlocks([]); setFactConfirmations({}); setConfirmedDraft(''); setConfirmedAt('');
+    jdReadVersion.current += 1;
+    setJdText(value);
     const ready = value.trim().length >= 80;
     if (ready && !jdReadyTracked.current) trackEvent('jd_input_ready', { method: 'edit' });
     jdReadyTracked.current = ready;
@@ -604,11 +648,13 @@ export default function NewMatchPage() {
       setJdState('error'); setJdMessage(t.invalidUrl); return;
     }
     const source = sourceLabels[identifyJobSource(parsedUrl.toString())];
+    const version = ++jdReadVersion.current;
     setJdSource(source); setJdState('working'); setJdMessage('');
     trackEvent('jd_link_parse_started', { source });
     try {
       const response = await fetch('/api/jd/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: parsedUrl.toString() }) });
       const data = (await response.json()) as { status?: string; error?: string; code?: string; sourceLabel?: string; canonicalUrl?: string; jdText?: string; title?: string; company?: string; location?: string };
+      if (version !== jdReadVersion.current) return;
       if (data.sourceLabel) setJdSource(data.sourceLabel);
       if (data.canonicalUrl) setJdEntry(data.canonicalUrl);
       if (data.status === 'success' && data.jdText) {
@@ -619,11 +665,13 @@ export default function NewMatchPage() {
       } else if ((data.error || data.code) === 'SITE_RATE_LIMIT') { setJdState('error'); setJdMessage(t.siteRate); }
       else if (data.code === 'JOB_DETAIL_REQUIRED') { setJdState('paste_required'); setJdMessage(t.detailLinkRequired); trackEvent('jd_link_parse_failed', { reason: data.code, source }); }
       else { setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: data.error || data.code || 'paste_required', source }); }
-    } catch { setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: 'network_error', source }); }
+    } catch { if (version !== jdReadVersion.current) return; setJdState('paste_required'); setJdMessage(t.pasteRequired); trackEvent('jd_link_parse_failed', { reason: 'network_error', source }); }
   }
 
   const resumeReady = resumeText.trim().length >= 80;
   const jdReady = jdText.trim().length >= 80;
+  const analysisStale = Boolean(analysis && (analysisResume !== resumeText || analysisJd !== jdText));
+  const unresolvedGates = analysis?.hardRequirements.filter((item) => item.status !== 'met') ?? [];
   const looksLikeUrl = /^https?:\/\//i.test(jdEntry.trim());
   const statusCopy: Record<EvidenceStatus, string> = { strong: t.statusStrong, partial: t.statusPartial, gap: t.statusGap };
   const decisionCopy = analysis ? { apply: t.decisionApply, review_first: t.decisionReview, skip: t.decisionSkip }[analysis.decision] : '';
@@ -662,6 +710,18 @@ export default function NewMatchPage() {
     { id: 'minimal', name: t.templateMinimal, description: t.templateMinimalBody },
   ];
   const draftConfirmed = confirmedDraft.length >= 80 && confirmedDraft === reviewDraft;
+  const pdfSourceKey = JSON.stringify([reviewPreviewBlocks, selectedTemplate, language]);
+  const visiblePdfUrl = draftConfirmed && pdfPreview?.key === pdfSourceKey ? pdfPreview.url : '';
+
+  useEffect(() => {
+    pdfGeneration.current += 1;
+    if (pdfCache.current && pdfCache.current.key !== pdfSourceKey) {
+      URL.revokeObjectURL(pdfCache.current.url);
+      pdfCache.current = null;
+    }
+  }, [pdfSourceKey]);
+
+  useEffect(() => () => { pdfGeneration.current += 1; if (pdfCache.current) URL.revokeObjectURL(pdfCache.current.url); pdfCache.current = null; }, []);
 
   useEffect(() => {
     if (screen !== 'review' || !exportReady || exportReadyTrackedRef.current) return;
@@ -670,7 +730,7 @@ export default function NewMatchPage() {
   }, [exportReady, screen, selectedTemplate]);
 
   function buildTextReview() {
-    if (!analysis) return;
+    if (!analysis || analysisStale) return;
     const candidates = adoptedSuggestions.map((suggestion) => {
       const start = suggestion.sourceStart;
       const revised = (suggestionNotes[suggestion.id] ?? suggestion.revisedText).trim();
@@ -695,12 +755,13 @@ export default function NewMatchPage() {
         ? mergeReview(reviewBlocks, parseReviewBlocks(generatedReview), parseReviewBlocks(merged))
         : { blocks: reviewBlocks, conflicts: 1 };
       applyReviewBlocks(result.blocks, 'checkpoint');
+      setReviewBaseline(resumeText);
       if (result.conflicts) setMergeNotice(language === 'zh'
         ? '已保留你的手工编辑。部分新建议与现有内容冲突，未自动合并；请在“本轮已采用修改”中对照修改。'
         : 'Your edits are preserved. Some suggestions conflict with the current draft and were not merged. Compare them in Adopted changes.');
       else setGeneratedReview(merged);
       setScreen('review');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToTop();
       return;
     }
     setGeneratedReview(merged);
@@ -718,7 +779,7 @@ export default function NewMatchPage() {
     setConfirmedAt('');
     setScreen('review');
     trackEvent('review_draft_built', { adopted_suggestions: adoptedSuggestions.length, template: selectedTemplate });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
   }
 
   function confirmDraftForExport() {
@@ -816,8 +877,10 @@ export default function NewMatchPage() {
   }
 
   async function downloadResumeDocx() {
-    if (!confirmDraftForExport()) return;
+    if (!confirmDraftForExport() || docxExportState === 'working') return;
+    setDocxExportState('working');
     trackEvent('resume_export_started', { format: 'docx', template: selectedTemplate });
+    try {
     const blob = await resumeDocxBlob(reviewPreviewBlocks, language, selectedTemplate);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -828,25 +891,31 @@ export default function NewMatchPage() {
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
     trackEvent('resume_exported', { format: 'docx', template: selectedTemplate });
+    setDocxExportState('idle');
+    } catch {
+      setDocxExportState('error');
+      trackEvent('resume_export_failed', { format: 'docx', reason: 'generation_failed', template: selectedTemplate });
+    }
   }
 
-  async function downloadResumePdf() {
+  async function prepareResumePdf() {
     if (!confirmDraftForExport() || pdfExportState === 'working') return;
+    if (pdfCache.current?.key === pdfSourceKey) {
+      setPdfPreview({ key: pdfSourceKey, url: pdfCache.current.url, blob: pdfCache.current.blob });
+      return pdfCache.current;
+    }
     setPdfExportState('working');
-    trackEvent('resume_export_started', { format: 'pdf', template: selectedTemplate });
+    const generation = pdfGeneration.current;
     try {
       const { createResumePdfBlob } = await import('../../lib/resume-pdf');
       const blob = await createResumePdfBlob(reviewPreviewBlocks, selectedTemplate, language);
+      if (generation !== pdfGeneration.current) { setPdfExportState('idle'); return; }
       const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${resumeFileBase()}.pdf`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      const file = { key: pdfSourceKey, blob, url };
+      pdfCache.current = file;
+      setPdfPreview({ key: pdfSourceKey, url, blob });
       setPdfExportState('idle');
-      trackEvent('resume_exported', { format: 'pdf', template: selectedTemplate });
+      return file;
     } catch (error) {
       console.error('PDF generation failed', error instanceof Error ? error.message : 'unknown');
       setPdfExportState('error');
@@ -854,9 +923,28 @@ export default function NewMatchPage() {
     }
   }
 
+  async function previewResumePdf() {
+    const file = await prepareResumePdf();
+    if (file) { trackEvent('resume_pdf_previewed', { template: selectedTemplate }); window.setTimeout(() => document.getElementById('pdf-final-title')?.scrollIntoView({ block: 'start', behavior: 'auto' }), 0); }
+  }
+
+  async function downloadResumePdf() {
+    trackEvent('resume_export_started', { format: 'pdf', template: selectedTemplate });
+    const file = await prepareResumePdf();
+    if (!file) return;
+    const anchor = document.createElement('a');
+    anchor.href = file.url;
+    anchor.download = `${resumeFileBase()}.pdf`;
+    document.body.appendChild(anchor); anchor.click(); anchor.remove();
+    trackEvent('resume_exported', { format: 'pdf', template: selectedTemplate });
+  }
+
   function startAnotherMatch() {
+    analysisRequestRef.current?.abort(); analysisRequestRef.current = null;
+    resumeReadVersion.current += 1; jdReadVersion.current += 1;
+    setAnalysisState('idle'); setAnalysisError('');
     beginMatch();
-    const nextResume = confirmedDraft || reviewDraft || resumeText;
+    const nextResume = isDemo && resumeText === analysisResume ? '' : analysisStale ? resumeText : confirmedDraft || reviewDraft || resumeText;
     setResumeMode('paste');
     setResumeFile(null);
     setResumeName('');
@@ -873,6 +961,7 @@ export default function NewMatchPage() {
     setJobCompany('');
     setJobLocation('');
     setAnalysis(null);
+    setAnalysisResume(''); setAnalysisJd(''); setIsDemo(false);
     setSuggestionDecisions({});
     setSuggestionNotes({});
     setReviewDraft('');
@@ -889,15 +978,32 @@ export default function NewMatchPage() {
     jdReadyTracked.current = false;
     setScreen('materials');
     trackEvent('new_match_started', { resume_source: 'confirmed_draft' });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
+  }
+
+  function cancelAnalysis() {
+    analysisRequestRef.current?.abort();
+    analysisRequestRef.current = null;
+    setAnalysisState('idle');
+    setAnalysisError(language === 'zh' ? '已取消。本次材料和之前的审核稿都已保留。' : 'Cancelled. Your materials and previous draft have been kept.');
+  }
+
+  function addGateEvidence(requirement: string) {
+    setEvidenceHint(language === 'zh' ? `请在简历中补充能证明“${requirement}”的真实经历或资格，然后重新分析。不会仅凭勾选提高匹配分。` : `Add genuine experience or qualifications supporting “${requirement}”, then analyze again. A checkbox cannot establish eligibility.`);
+    setResumeMode('paste');
+    setScreen('materials');
+    window.setTimeout(() => { resumeTextRef.current?.focus(); resumeTextRef.current?.scrollIntoView({ block: 'center', behavior: 'auto' }); }, 0);
   }
 
   async function runAiAnalysis() {
-    if (!resumeReady || !jdReady || analysisState === 'working') return;
+    if (!resumeReady || !jdReady || resumeState === 'working' || jdState === 'working' || analysisState === 'working') return;
     beginMatch();
-    setAnalysisSeconds(0); setAnalysisState('working'); setAnalysisError(''); setSuggestionDecisions({}); setSuggestionNotes({}); setReviewDraft(''); setReviewBaseline(''); setReviewBlocks([]); setFactConfirmations({}); setConfirmedDraft(''); setConfirmedAt('');
+    setAnalysisSeconds(0); setAnalysisState('working'); setAnalysisError('');
     trackEvent('analysis_started', { resume_method: resumeMode, jd_method: jdFile ? 'file' : looksLikeUrl ? 'url' : 'paste', language });
     const controller = new AbortController();
+    analysisRequestRef.current = controller;
+    const resumeVersion = resumeReadVersion.current;
+    const jdVersion = jdReadVersion.current;
     const timeout = window.setTimeout(() => controller.abort(), 70_000);
     try {
       const response = await fetch('/api/match/analyze', {
@@ -906,6 +1012,12 @@ export default function NewMatchPage() {
         signal: controller.signal,
       });
       const data = (await response.json()) as { analysis?: unknown; error?: string; sampleReference?: string | null };
+      if (analysisRequestRef.current !== controller) return;
+      if (resumeVersion !== resumeReadVersion.current || jdVersion !== jdReadVersion.current) {
+        setAnalysisState('idle');
+        setAnalysisError(language === 'zh' ? '材料在分析期间有变更。已保留旧稿，请使用最新材料重新分析。' : 'Your materials changed during analysis. Your previous draft is safe; analyze the updated materials.');
+        return;
+      }
       if (!response.ok || !isMatchAnalysis(data.analysis)) {
         const errors: Record<string, string> = {
           AI_NOT_CONFIGURED: t.aiNotConfigured,
@@ -921,6 +1033,8 @@ export default function NewMatchPage() {
         trackEvent('analysis_failed', { reason: (data.error || 'invalid_report').slice(0, 36) });
         setAnalysisState('error'); return;
       }
+      setAnalysisResume(resumeText); setAnalysisJd(jdText); setIsDemo(false); setEvidenceHint('');
+      setSuggestionDecisions({}); setSuggestionNotes({});
       setResumeNeedsReview(false); setAnalysis(data.analysis); setAnalysisState('idle'); setSampleReference(typeof data.sampleReference === 'string' ? data.sampleReference : ''); setSampleDeleted(false); setFeedbackIntent('idle'); setFeedbackState('idle'); setScreen('results');
       trackEvent('analysis_completed', {
         grade: data.analysis.grade,
@@ -931,12 +1045,13 @@ export default function NewMatchPage() {
         unverified_gate_count: data.analysis.hardRequirements.filter((item) => item.status === 'unverified').length,
         unmet_gate_count: data.analysis.hardRequirements.filter((item) => item.status === 'not_met').length,
       });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToTop();
     } catch (error) {
+      if (analysisRequestRef.current !== controller) return;
       const reason = error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'network_error';
       setAnalysisError(reason === 'timeout' ? t.aiTimeout : t.aiFailed); setAnalysisState('error');
       trackEvent('analysis_failed', { reason });
-    } finally { window.clearTimeout(timeout); }
+    } finally { window.clearTimeout(timeout); if (analysisRequestRef.current === controller) analysisRequestRef.current = null; }
   }
 
   async function deleteSavedSample() {
@@ -979,12 +1094,17 @@ export default function NewMatchPage() {
         <button type="button" className="language-button" onClick={toggleLanguage}>{language === 'zh' ? 'EN' : '中文'}</button>
       </nav>
 
+      <nav className="workspace-phase-nav" aria-label={language === 'zh' ? '当前进度' : 'Your progress'}>
+        {(['materials', 'results', 'review'] as const).map((phase, index) => <button key={phase} type="button" aria-current={screen === phase ? 'step' : undefined} disabled={phase === 'results' ? !analysis : phase === 'review' ? !reviewDraft : false} onClick={() => { setScreen(phase); scrollToTop(); }}><span>{index + 1}</span>{(language === 'zh' ? ['准备材料', '判断与修改', '审核与导出'] : ['Materials', 'Match & edits', 'Review & export'])[index]}</button>)}
+      </nav>
+      {isDemo && <div className="demo-notice" role="status">{language === 'zh' ? '你正在体验虚构示例，不是真实候选人资料，也未调用 AI。' : 'You are viewing a fictional example, not a real candidate or a new AI analysis.'}<button type="button" onClick={startAnotherMatch}>{language === 'zh' ? '换成我的材料' : 'Use my own materials'}</button></div>}
+      {analysisStale && <div className="preserved-draft-notice" role="status">{language === 'zh' ? '材料有更新。旧报告不代表最新材料；手工编辑已保留，重新分析成功后可合并新建议。' : 'Your materials changed. The old report is out of date; manual edits are kept until you merge new suggestions.'}{screen !== 'materials' && <button type="button" onClick={() => setScreen('materials')}>{language === 'zh' ? '返回材料重新分析' : 'Analyze updated materials'}</button>}</div>}
       {screen === 'materials' ? (
         <section className="workspace-main" aria-labelledby="workspace-title">
           <header className="workspace-header">
-            <div><h1 id="workspace-title">{t.workspaceTitle}</h1><p>{t.workspaceBody}</p></div>
+            <div><h1 id="workspace-title" tabIndex={-1}>{t.workspaceTitle}</h1><p>{t.workspaceBody}</p></div>
             <div className="workspace-header-actions">
-              <div className="material-status" aria-label={language === 'zh' ? '材料状态' : 'Material status'}>
+              <div className="material-status" role="status" aria-label={language === 'zh' ? '材料状态' : 'Material status'}>
                 <span className={resumeReady ? 'is-ready' : ''}>{resumeReady ? t.resumeReady : t.resumeWaiting}</span>
                 <span className={jdReady ? 'is-ready' : ''}>{jdReady ? t.jdReady : t.jdWaiting}</span>
               </div>
@@ -992,6 +1112,8 @@ export default function NewMatchPage() {
             </div>
           </header>
 
+          {evidenceHint && <p className="material-evidence-hint" role="status">{evidenceHint}</p>}
+          {analysis && <div className="saved-work-actions"><span>{language === 'zh' ? '上次结果与审核稿仍在当前标签页。' : 'Your last result and draft are still in this tab.'}</span><button type="button" onClick={() => setScreen('results')}>{language === 'zh' ? '查看上次结果' : 'View last result'}</button>{reviewDraft && <button type="button" onClick={() => setScreen('review')}>{language === 'zh' ? '继续编辑审核稿' : 'Continue editing draft'}</button>}</div>}
           <div className="materials-grid">
             <article className="material-card">
               <header><div><h2>{t.resumeTitle}</h2><p>{t.resumeBody}</p></div><span className={resumeReady ? 'material-check is-ready' : 'material-check'}>{resumeReady ? '✓' : '-'}</span></header>
@@ -1003,8 +1125,8 @@ export default function NewMatchPage() {
                 </div>
               </div>}
               <div className="material-tabs" role="group" aria-label={t.resumeTitle}>
-                <button type="button" className={resumeMode === 'upload' ? 'is-active' : ''} onClick={() => setResumeMode('upload')}>{t.upload}</button>
-                <button type="button" className={resumeMode === 'paste' ? 'is-active' : ''} onClick={() => setResumeMode('paste')}>{t.paste}</button>
+                <button type="button" className={resumeMode === 'upload' ? 'is-active' : ''} aria-pressed={resumeMode === 'upload'} onClick={() => setResumeMode('upload')}>{t.upload}</button>
+                <button type="button" className={resumeMode === 'paste' ? 'is-active' : ''} aria-pressed={resumeMode === 'paste'} onClick={() => setResumeMode('paste')}>{t.paste}</button>
               </div>
               {resumeMode === 'upload' ? (
                 <>
@@ -1018,7 +1140,7 @@ export default function NewMatchPage() {
                   {resumeState === 'ready' && <p className={resumeReady ? 'inline-note is-success' : 'inline-note'}>{resumeReady ? t.parsed : t.pendingOcr}</p>}
                   {resumeText && <details className="parsed-review" open={resumeNeedsReview}><summary>{resumeFile ? t.reviewResume : t.restoredResume}<span>{resumeText.length.toLocaleString()} {t.characters}</span></summary><textarea aria-label={t.resumeTitle} value={resumeText} rows={12} onChange={(event) => changeResumeText(event.target.value)} /></details>}
                 </>
-              ) : <label className="material-textarea"><textarea aria-label={t.resumeTitle} value={resumeText} rows={15} placeholder={t.resumePlaceholder} onChange={(event) => changeResumeText(event.target.value)} /><small>{resumeText.length.toLocaleString()} {t.characters}</small></label>}
+              ) : <label className="material-textarea"><textarea ref={resumeTextRef} aria-label={t.resumeTitle} value={resumeText} rows={15} placeholder={t.resumePlaceholder} onChange={(event) => changeResumeText(event.target.value)} /><small>{resumeText.length.toLocaleString()} {t.characters}</small></label>}
               {resumeReady && !baseResumeMatches && <button type="button" className="base-resume-save" onClick={saveBaseResume}>{baseResume ? t.updateBaseResume : t.saveBaseResume}<span aria-hidden="true">＋</span></button>}
               {resumeReady && !baseResume && <p className="local-save-hint">{t.baseResumeHint}</p>}
               {baseMessage && <p className="inline-note" role="status">{baseMessage}</p>}
@@ -1042,21 +1164,23 @@ export default function NewMatchPage() {
           </div>
 
           {analysisError && <p className="analysis-error" role="alert">{analysisError}</p>}
+          {analysisState === 'working' && <div className="analysis-progress" role="status"><span>{language === 'zh' ? '正在对照岗位要求与简历证据。可以取消，不会丢失原稿。' : 'Comparing the role with your experience. You can cancel without losing your draft.'}</span><button type="button" onClick={cancelAnalysis}>{language === 'zh' ? '取消分析' : 'Cancel analysis'}</button></div>}
           <footer className="workspace-action">
             <div><p>{t.startHint}</p><label className="sample-consent"><input type="checkbox" checked={sampleConsent} onChange={(event) => setSampleConsent(event.target.checked)} /><span>{t.sampleConsent}</span><Link href="/privacy" target="_blank">{t.samplePrivacy}</Link></label></div>
-            <button type="button" disabled={!resumeReady || !jdReady || analysisState === 'working'} onClick={runAiAnalysis}>{analysisState === 'working' ? `${t.analyzing} ${analysisSeconds}s` : resumeNeedsReview ? t.confirmAndAnalyze : t.start}<span aria-hidden="true">→</span></button>
+            <button type="button" disabled={!resumeReady || !jdReady || resumeState === 'working' || jdState === 'working' || analysisState === 'working'} onClick={runAiAnalysis}>{analysisState === 'working' ? `${t.analyzing} ${analysisSeconds}s` : resumeNeedsReview ? t.confirmAndAnalyze : t.start}<span aria-hidden="true">→</span></button>
           </footer>
         </section>
       ) : screen === 'results' && analysis ? (
         <section className="match-workbench" aria-labelledby="match-workbench-title">
           <div className="results-toolbar"><button type="button" onClick={() => setScreen('materials')}><span aria-hidden="true">←</span>{t.resultBack}</button><small>{t.localRules}</small></div>
-          <header className="workbench-heading"><div><h1 id="match-workbench-title">{jobTitle || t.matchTitle}</h1><p>{[jobCompany, language === 'zh' ? '先看需要补强的地方，再选择要采用的修改。' : 'Review the gaps, then choose the edits you want to keep.'].filter(Boolean).join(' · ')}</p></div></header>
+          <header className="workbench-heading"><div><h1 id="match-workbench-title" tabIndex={-1}>{jobTitle || t.matchTitle}</h1><p>{[jobCompany, language === 'zh' ? '先看需要补强的地方，再选择要采用的修改。' : 'Review the gaps, then choose the edits you want to keep.'].filter(Boolean).join(' · ')}</p></div></header>
           {(sampleReference || sampleDeleted) && <div className="sample-receipt"><span>{sampleDeleted ? t.sampleDeleted : `${t.sampleSaved} · ${sampleReference.slice(0, 8)}`}</span>{sampleReference && <button type="button" onClick={deleteSavedSample}>{t.sampleDelete}</button>}</div>}
           <div className="result-decision-grid">
             <article className={`result-verdict decision-${analysis.decision}`}><div className="decision-primary"><span>{t.decisionLabel}</span><strong>{decisionCopy}</strong><b>{decisionNote}</b></div><div className="decision-summary"><blockquote>{analysis.summary}</blockquote><p><span>{t.scoreLabel}</span><b>{analysis.overall}<small>/100</small></b></p></div><small>{t.scoreMethod}</small></article>
             <article className="result-priorities"><h2>{t.nextFocusTitle}</h2>{priorityEvidence.length ? <ol>{priorityEvidence.map((item) => <li key={item.requirement}><span>{item.importance}</span><p>{item.requirement}</p></li>)}</ol> : <p className="priority-empty">{t.nextFocusEmpty}</p>}</article>
           </div>
-          <div className="result-next-actions"><button type="button" onClick={() => { document.getElementById('rewrite-suggestions')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); document.getElementById('rewrite-suggestions')?.focus({ preventScroll: true }); }}>{language === 'zh' ? '查看具体修改建议' : 'Review suggested edits'} ↓</button><button type="button" onClick={buildTextReview}>{reviewDraft ? (language === 'zh' ? '继续编辑简历' : 'Continue editing') : (language === 'zh' ? '进入简历审核稿' : 'Open resume draft')} →</button></div>
+          <div className="result-next-actions"><button type="button" disabled={analysisStale} onClick={() => { document.getElementById('rewrite-suggestions')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); document.getElementById('rewrite-suggestions')?.focus({ preventScroll: true }); }}>{language === 'zh' ? '查看具体修改建议' : 'Review suggested edits'} ↓</button><button type="button" disabled={analysisStale} onClick={buildTextReview}>{adoptedSuggestions.length ? (language === 'zh' ? `审核简历（已采用 ${adoptedSuggestions.length} 条）` : `Review resume (${adoptedSuggestions.length} adopted)`) : (language === 'zh' ? '继续审核原文' : 'Review original resume')} →</button></div>
+          {unresolvedGates.length > 0 && <section className="hard-gate-summary" aria-labelledby="unresolved-gates-title"><header><h2 id="unresolved-gates-title">{language === 'zh' ? '投递前，先核对这些门槛' : 'Check these requirements before applying'}</h2><p>{language === 'zh' ? '未找到证据不等于不符合；如果确实不符合，改写也不会消除差距。' : 'Missing evidence is not the same as ineligibility. Wording cannot resolve a requirement you do not meet.'}</p></header><div>{unresolvedGates.map((item, index) => <article className="hard-gate-card" key={index}><span className={`hard-status status-${item.status}`}>{hardStatusCopy[item.status]}</span><h3>{item.requirement}</h3><p>{item.rationale}</p><details><summary>{language === 'zh' ? '查看本次岗位原文' : 'View job description'}</summary><p className="job-source-excerpt">{analysisJd}</p></details><button type="button" onClick={() => addGateEvidence(item.requirement)}>{language === 'zh' ? '补充真实经历或资格' : 'Add supporting experience'}</button></article>)}</div></section>}
           <details className="result-details"><summary>{language === 'zh' ? '评分依据与岗位硬性要求' : 'Scoring and eligibility requirements'}</summary><div className="result-dimensions">{[
               { label: t.mustCoverage, value: analysis.scoring.mustCoverage, note: t.mustNote },
               { label: t.importantCoverage, value: analysis.scoring.importantCoverage, note: t.importantNote },
@@ -1065,25 +1189,15 @@ export default function NewMatchPage() {
           <section className="hard-requirements" aria-labelledby="hard-requirements-title"><header><div><h2 id="hard-requirements-title">{t.hardTitle}</h2><p>{t.hardBody}</p></div><span>{analysis.hardRequirements.length}</span></header>{analysis.hardRequirements.length ? <div>{analysis.hardRequirements.map((item, index) => <article key={`${item.requirement}-${index}`}><div><span className={`hard-status status-${item.status}`}>{hardStatusCopy[item.status]}</span><small>{hardCategoryCopy[item.category]}</small></div><h3>{item.requirement}</h3><p>{item.rationale}</p>{item.resumeEvidence.length > 0 && <blockquote><span>{t.hardEvidence}</span>{item.resumeEvidence.join(' / ')}</blockquote>}</article>)}</div> : <p className="hard-empty">{t.hardEmpty}</p>}</section>
           </details>
           <details className="evidence-section"><summary><div><h2>{t.evidenceTitle}</h2><p>{t.evidenceBody}</p></div><span>{analysis.evidence.length}</span></summary><div className="evidence-list">{analysis.evidence.map((item, index) => <article key={`${item.requirement}-${index}`}><div className="evidence-topline"><span className={`evidence-status status-${item.status}`}>{statusCopy[item.status]}</span><small>{item.importance}</small></div><p className="evidence-requirement">{item.requirement}</p>{item.resumeEvidence.length ? <blockquote><span>{t.evidenceQuote}</span>{item.resumeEvidence.join(' / ')}</blockquote> : <small>{t.noMatchedTerms}</small>}<p className="evidence-rationale"><span>{t.whyMatch}</span>{item.rationale}</p></article>)}</div></details>
-          <section className="result-feedback" aria-labelledby="result-feedback-title">
-            <div><h2 id="result-feedback-title">{t.feedbackTitle}</h2><p>{t.feedbackBody}</p></div>
-            {feedbackState === 'submitted' ? <p className="feedback-thanks" role="status">{t.feedbackThanks}</p> : <div className="feedback-control">
-              <div className="feedback-primary"><button type="button" disabled={feedbackState === 'submitting'} onClick={() => submitFeedback(true, 'helpful')}>{t.feedbackYes}</button><button type="button" aria-expanded={feedbackIntent === 'negative'} disabled={feedbackState === 'submitting'} onClick={() => { setFeedbackIntent('negative'); setFeedbackState('idle'); }}>{t.feedbackNo}</button></div>
-              {feedbackIntent === 'negative' && <div className="feedback-reasons"><span>{t.feedbackWhy}</span>{([
-                ['score_unfair', t.feedbackScore], ['evidence_missed', t.feedbackEvidence], ['suggestions_weak', t.feedbackSuggestions], ['unclear', t.feedbackUnclear], ['other', t.feedbackOther],
-              ] as Array<[FeedbackReason, string]>).map(([reason, label]) => <button key={reason} type="button" disabled={feedbackState === 'submitting'} onClick={() => submitFeedback(false, reason)}>{label}</button>)}</div>}
-              {feedbackState === 'error' && <p className="feedback-error" role="alert">{t.feedbackError}</p>}
-            </div>}
-          </section>
-          <OptimizationReview analysis={analysis} language={language} decisions={suggestionDecisions} notes={suggestionNotes} onDecision={(id, decision) => { setSuggestionDecisions((current) => ({ ...current, [id]: decision })); trackEvent('suggestion_reviewed', { decision }); }} onNote={(id, note) => setSuggestionNotes((current) => ({ ...current, [id]: note }))} onBack={() => setScreen('materials')} onBuildDraft={buildTextReview} />
+          {!analysisStale && <OptimizationReview analysis={analysis} language={language} decisions={suggestionDecisions} notes={suggestionNotes} onDecision={(id, decision) => { setSuggestionDecisions((current) => ({ ...current, [id]: decision })); trackEvent('suggestion_reviewed', { decision }); }} onNote={(id, note) => setSuggestionNotes((current) => ({ ...current, [id]: note }))} onBack={() => setScreen('materials')} onBuildDraft={buildTextReview} />}
         </section>
       ) : screen === 'review' && analysis ? (
         <section className="text-review-shell" aria-labelledby="text-review-title">
-          <header className="text-review-header"><span>{t.reviewEyebrow}</span><h1 id="text-review-title">{t.reviewTitle}</h1><p>{t.reviewBody}</p></header>
+          <header className="text-review-header"><span>{t.reviewEyebrow}</span><h1 id="text-review-title" tabIndex={-1}>{t.reviewTitle}</h1><p>{t.reviewBody}</p></header>
           {mergeNotice && <p className="review-quality-status is-warning" role="status">{mergeNotice}</p>}
           <div className="review-template-bar">
             <div className="review-template-options" role="radiogroup" aria-label={t.templateEyebrow}>
-              {templateOptions.map((option) => <button key={option.id} type="button" role="radio" aria-checked={selectedTemplate === option.id} className={selectedTemplate === option.id ? 'is-selected' : ''} onClick={() => setSelectedTemplate(option.id)}>{option.name}</button>)}
+              {templateOptions.map((option) => <button key={option.id} type="button" role="radio" aria-checked={selectedTemplate === option.id} tabIndex={selectedTemplate === option.id ? 0 : -1} onKeyDown={(event) => { const direction = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0; if (!direction && event.key !== 'Home' && event.key !== 'End') return; event.preventDefault(); const index = event.key === 'Home' ? 0 : event.key === 'End' ? templateOptions.length - 1 : (templateOptions.findIndex((item) => item.id === selectedTemplate) + direction + templateOptions.length) % templateOptions.length; setSelectedTemplate(templateOptions[index].id); (event.currentTarget.parentElement?.children[index] as HTMLButtonElement)?.focus(); }} className={selectedTemplate === option.id ? 'is-selected' : ''} onClick={() => setSelectedTemplate(option.id)}>{option.name}</button>)}
             </div>
             <p className={draftConfirmed ? 'draft-status is-confirmed' : 'draft-status'}>{draftConfirmed ? `${t.confirmedEyebrow} · ${new Date(confirmedAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', { hour12: false })}` : t.reviewWarning}</p>
           </div>
@@ -1118,16 +1232,31 @@ export default function NewMatchPage() {
           {reviewReady && !factReviewReady && <p className="fact-export-block" role="status">{t.factBlocked}</p>}
           <div className="pdf-readiness" role="status"><span aria-hidden="true">PDF</span><div><strong>{t.pdfCheckTitle}</strong><p>{t.pdfCheckBody}</p></div></div>
           {pdfExportState === 'error' && <p className="analysis-error" role="alert">{t.pdfError}</p>}
+          {docxExportState === 'error' && <p className="analysis-error" role="alert">{language === 'zh' ? 'DOCX 生成失败，审核稿已保留。请重试或下载 PDF。' : 'DOCX generation failed. Your draft is safe; retry or download PDF.'}</p>}
+          {visiblePdfUrl && pdfPreview && <ResumePdfPreview key={visiblePdfUrl} url={visiblePdfUrl} blob={pdfPreview.blob} language={language} onDownload={downloadResumePdf} />}
           <div className="text-review-actions">
             <button type="button" onClick={() => setScreen('results')}><span aria-hidden="true">←</span>{t.reviewBack}</button>
             <div className="review-export-actions">
+              <button type="button" disabled={!exportReady || pdfExportState === 'working'} onClick={previewResumePdf}>{pdfExportState === 'working' ? t.pdfGenerating : visiblePdfUrl ? (language === 'zh' ? '查看已确认 PDF' : 'View approved PDF') : (language === 'zh' ? '确认文字并预览 PDF' : 'Approve text & preview PDF')}</button>
               <button type="button" disabled={!exportReady || pdfExportState === 'working'} onClick={downloadResumePdf}>{pdfExportState === 'working' ? t.pdfGenerating : t.exportPrint}<span aria-hidden="true">→</span></button>
-              <button type="button" disabled={!exportReady} onClick={downloadResumeDocx}>{t.exportDocx}</button>
+              <button type="button" disabled={!exportReady || docxExportState === 'working'} onClick={downloadResumeDocx}>{docxExportState === 'working' ? (language === 'zh' ? '正在生成 DOCX…' : 'Generating DOCX…') : t.exportDocx}</button>
               <details className="export-more"><summary>{t.exportMore}</summary><button type="button" disabled={!exportReady} onClick={downloadResumeHtml}>{t.exportDownload}</button></details>
               {draftConfirmed && <button type="button" className="is-secondary" onClick={startAnotherMatch}>{t.exportAnother}</button>}
             </div>
           </div>
           <p className="export-print-hint">{t.exportPrintHint}</p>
+          {draftConfirmed && <>
+<section className="result-feedback" aria-labelledby="result-feedback-title">
+            <div><h2 id="result-feedback-title">{t.feedbackTitle}</h2><p>{t.feedbackBody}</p></div>
+            {feedbackState === 'submitted' ? <p className="feedback-thanks" role="status">{t.feedbackThanks}</p> : <div className="feedback-control">
+              <div className="feedback-primary"><button type="button" disabled={feedbackState === 'submitting'} onClick={() => submitFeedback(true, 'helpful')}>{t.feedbackYes}</button><button type="button" aria-expanded={feedbackIntent === 'negative'} disabled={feedbackState === 'submitting'} onClick={() => { setFeedbackIntent('negative'); setFeedbackState('idle'); }}>{t.feedbackNo}</button></div>
+              {feedbackIntent === 'negative' && <div className="feedback-reasons"><span>{t.feedbackWhy}</span>{([
+                ['score_unfair', t.feedbackScore], ['evidence_missed', t.feedbackEvidence], ['suggestions_weak', t.feedbackSuggestions], ['unclear', t.feedbackUnclear], ['other', t.feedbackOther],
+              ] as Array<[FeedbackReason, string]>).map(([reason, label]) => <button key={reason} type="button" disabled={feedbackState === 'submitting'} onClick={() => submitFeedback(false, reason)}>{label}</button>)}</div>}
+              {feedbackState === 'error' && <p className="feedback-error" role="alert">{t.feedbackError}</p>}
+            </div>}
+          </section>
+          </>}
         </section>
       ) : null}
       <SiteFooter />
