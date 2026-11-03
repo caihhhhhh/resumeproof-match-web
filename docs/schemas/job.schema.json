@@ -25,7 +25,7 @@
       "pattern": "^[a-z0-9_-]+:[A-Za-z0-9._-]+$"
     },
     "source": {
-      "enum": ["greenhouse", "lever", "ashby", "company", "boss", "liepin", "linkedin", "manual"]
+      "enum": ["greenhouse", "lever", "ashby", "company", "boss", "liepin", "zhaopin", "linkedin", "manual"]
     },
     "source_job_id": { "type": "string" },
     "url": { "type": "string", "format": "uri" },

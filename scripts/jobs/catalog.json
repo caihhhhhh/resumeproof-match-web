@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "note": "Every entry is one public endpoint. Add a company by adding its ATS board token; no code change needed. Sources marked enabled:false are known tenants kept for reference until verified.",
+  "companies": [
+    { "id": "tencent", "adapter": "tencent", "company": "腾讯", "scope": "cn", "keywords": ["增长", "海外", "投放", "市场营销", "品牌", "商务拓展", "内容营销", "GTM"] },
+    { "id": "netease", "adapter": "netease", "company": "网易", "scope": "cn", "keywords": ["营销", "增长", "海外", "品牌", "投放"] },
+    { "id": "meituan", "adapter": "meituan", "company": "美团", "scope": "cn", "keywords": ["营销", "增长", "海外", "品牌", "投放"] },
+
+    { "id": "gh-stripe", "adapter": "greenhouse", "company": "Stripe", "scope": "global", "board": "stripe" },
+    { "id": "gh-airbnb", "adapter": "greenhouse", "company": "Airbnb", "scope": "global", "board": "airbnb" },
+    { "id": "gh-figma", "adapter": "greenhouse", "company": "Figma", "scope": "global", "board": "figma" },
+    { "id": "gh-databricks", "adapter": "greenhouse", "company": "Databricks", "scope": "global", "board": "databricks" },
+    { "id": "gh-discord", "adapter": "greenhouse", "company": "Discord", "scope": "global", "board": "discord" },
+    { "id": "gh-coinbase", "adapter": "greenhouse", "company": "Coinbase", "scope": "global", "board": "coinbase" },
+    { "id": "gh-gemini", "adapter": "greenhouse", "company": "Gemini", "scope": "global", "board": "gemini" },
+    { "id": "gh-reddit", "adapter": "greenhouse", "company": "Reddit", "scope": "global", "board": "reddit" },
+    { "id": "gh-robinhood", "adapter": "greenhouse", "company": "Robinhood", "scope": "global", "board": "robinhood" },
+    { "id": "gh-dropbox", "adapter": "greenhouse", "company": "Dropbox", "scope": "global", "board": "dropbox" },
+    { "id": "gh-instacart", "adapter": "greenhouse", "company": "Instacart", "scope": "global", "board": "instacart" },
+    { "id": "gh-pinterest", "adapter": "greenhouse", "company": "Pinterest", "scope": "global", "board": "pinterest" },
+    { "id": "gh-duolingo", "adapter": "greenhouse", "company": "Duolingo", "scope": "global", "board": "duolingo" },
+
+    { "id": "lv-spotify", "adapter": "lever", "company": "Spotify", "scope": "global", "site": "spotify" },
+    { "id": "lv-outreach", "adapter": "lever", "company": "Outreach", "scope": "global", "site": "outreach" },
+
+    { "id": "ab-ramp", "adapter": "ashby", "company": "Ramp", "scope": "global", "org": "ramp" },
+    { "id": "ab-linear", "adapter": "ashby", "company": "Linear", "scope": "global", "org": "linear" },
+    { "id": "ab-cursor", "adapter": "ashby", "company": "Cursor", "scope": "global", "org": "cursor" },
+    { "id": "ab-openai", "adapter": "ashby", "company": "OpenAI", "scope": "global", "org": "openai", "enabled": false },
+
+    { "id": "wd-nvidia", "adapter": "workday", "company": "NVIDIA", "scope": "global", "host": "nvidia.wd5.myworkdayjobs.com", "tenant": "nvidia", "site": "NVIDIAExternalCareerSite", "keywords": ["marketing", "growth"] },
+    { "id": "wd-salesforce", "adapter": "workday", "company": "Salesforce", "scope": "global", "host": "salesforce.wd12.myworkdayjobs.com", "tenant": "salesforce", "site": "External_Career_Site", "keywords": ["marketing"] },
+    { "id": "wd-adobe", "adapter": "workday", "company": "Adobe", "scope": "global", "host": "adobe.wd5.myworkdayjobs.com", "tenant": "adobe", "site": "external_experienced", "keywords": ["marketing"] },
+    { "id": "wd-cisco", "adapter": "workday", "company": "Cisco", "scope": "global", "host": "cisco.wd5.myworkdayjobs.com", "tenant": "cisco", "site": "Cisco_Careers", "keywords": ["marketing"] },
+    { "id": "wd-intel", "adapter": "workday", "company": "Intel", "scope": "global", "host": "intel.wd1.myworkdayjobs.com", "tenant": "intel", "site": "External", "keywords": ["marketing"] }
+  ]
+}

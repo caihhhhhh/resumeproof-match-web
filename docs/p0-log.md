@@ -36,9 +36,24 @@
 - 邮件投递一步需要用户确认收件人（JD 明示邮箱）与发件账号。
 - LLM 成本尚未产生（本轮只做规则筛）。
 
+## P0.2 多源引擎与平台捕获桥（2026-11-04）
+
+### 多源发现引擎
+- `scripts/jobs/{lib,sources,discover}.mjs` + `catalog.json`，7 个适配器覆盖 26 个源：
+  - 中国公司接口：腾讯、网易、美团（各按关键词抓取）。
+  - 海外 ATS：Greenhouse（Stripe/Airbnb/Figma/Databricks/Discord/Coinbase/Gemini/Reddit/Robinhood/Dropbox/Instacart/Pinterest/Duolingo）、Lever（Spotify/Outreach）、Ashby（Ramp/Linear/Cursor）、Workday（NVIDIA/Salesforce/Adobe/Cisco/Intel）。
+- 实测：26 源 → 3380 条 → 去重 3157 → 硬筛 213 → 短名单 40（每家公司最多 6 条）。
+- 失败隔离：单源异常只记 `perSource[id].error`，不影响其他源；OpenAI Ashby 因单次 payload 13MB 暂关。
+- 修正：`2025年毕业` 曾被当成「2025 年经验」；`3-5年` 取区间下限；总监/VP 标题降 6 分；仅美国 remote 的岗位按 UTC+7 时区拒掉（`US, Remote` 曾被漏判，现按 city 精确匹配）。
+
+### 平台捕获桥（BOSS/猎聘/智联）
+- `scripts/jobs/bridge.mjs`：仅绑定 127.0.0.1:7717，`POST /capture` 校验 site/url/JD 长度，写 `tmp/jobs/inbox/`。
+- `tools/capture-extension/`：MV3 content script，仅在三家岗位详情页出现按钮；点击才读取当前页；多层选择器 + `main` 兜底。
+- 验证：起桥 → POST 一条样例 → 生成 inbox JSON → `discover.mjs` 合并进短名单（见 run.json 的 `captures` 计数）。
+- 边界：不后台翻页、不模拟点击、不自动投递、不读 Cookie。
+
 ## 下一步
 
-1. 选定简历 → 对短名单前 3 条跑 `/api/match/analyze`（或本地等价流程），记录耗时与 token。
-2. 选 1 条做定向版 + `fact-audit`，导出 PDF。
-3. 生成投递包（简历 + 求职信 + 邮件草稿），人工确认后走跳转或邮件。
-4. 把耗时/失败点回填本文件，作为 P1 排期依据。
+1. 引擎产物落 D1（`jobs` 表）+ 定时抓取 + 站内「上传后匹配」读取，否则用户在网站上还看不到这批岗位。
+2. 选定简历 → 深度匹配 3 条 → 定向版 1 → 投递包 1。
+3. 捕获桥的站点选择器在三家真实页面各回归一次。
