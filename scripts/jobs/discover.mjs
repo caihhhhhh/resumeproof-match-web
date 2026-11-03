@@ -97,6 +97,9 @@ function isRejected(job, constraints, cities) {
   const jd = job.jd_text.toLowerCase();
   const city = job.location.city ?? '';
   if (/实习|\bintern\b|\binternship\b/.test(title)) return 'internship';
+  // Engineering/design titles match "monetization"/"growth" in the JD but are
+  // not roles this profile can take; the title gate alone let them through.
+  if (/\b(engineer|engineering|developer|scientist|designer|architect|devops|sre)\b/i.test(title)) return 'title-unrelated';
   const maxYears = constraints.max_required_experience_years;
   if (typeof maxYears === 'number' && typeof job._requiredYears === 'number' && job._requiredYears > maxYears) {
     return `requires-${job._requiredYears}y`;

@@ -42,7 +42,7 @@
 - `scripts/jobs/{lib,sources,discover}.mjs` + `catalog.json`，7 个适配器覆盖 26 个源：
   - 中国公司接口：腾讯、网易、美团（各按关键词抓取）。
   - 海外 ATS：Greenhouse（Stripe/Airbnb/Figma/Databricks/Discord/Coinbase/Gemini/Reddit/Robinhood/Dropbox/Instacart/Pinterest/Duolingo）、Lever（Spotify/Outreach）、Ashby（Ramp/Linear/Cursor）、Workday（NVIDIA/Salesforce/Adobe/Cisco/Intel）。
-- 实测：26 源 → 3380 条 → 去重 3157 → 硬筛 213 → 短名单 40（每家公司最多 6 条）。
+- 实测：26 源 → 3483 条 → 去重 3258 → 硬筛 208 → 短名单 40（每家公司最多 6 条）。
 - 失败隔离：单源异常只记 `perSource[id].error`，不影响其他源；OpenAI Ashby 因单次 payload 13MB 暂关。
 - 修正：`2025年毕业` 曾被当成「2025 年经验」；`3-5年` 取区间下限；总监/VP 标题降 6 分；仅美国 remote 的岗位按 UTC+7 时区拒掉（`US, Remote` 曾被漏判，现按 city 精确匹配）。
 
@@ -57,3 +57,4 @@
 1. 引擎产物落 D1（`jobs` 表）+ 定时抓取 + 站内「上传后匹配」读取，否则用户在网站上还看不到这批岗位。
 2. 选定简历 → 深度匹配 3 条 → 定向版 1 → 投递包 1。
 3. 捕获桥的站点选择器在三家真实页面各回归一次。
+

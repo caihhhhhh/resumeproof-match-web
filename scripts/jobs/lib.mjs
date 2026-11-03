@@ -115,20 +115,39 @@ export async function fetchWithTimeout(url, options = {}, ms = 15000) {
   return res;
 }
 
-export async function getJson(url, ms = 15000, headers = {}) {
-  const res = await fetchWithTimeout(url, {
-    headers: { 'user-agent': UA, accept: 'application/json', ...headers },
-  }, ms);
-  return res.json();
+export async function getJson(url, ms = 20000, headers = {}) {
+  return retry(async () => {
+    const res = await fetchWithTimeout(url, {
+      headers: { 'user-agent': UA, accept: 'application/json', ...headers },
+    }, ms);
+    return res.json();
+  });
 }
 
-export async function postJson(url, body, ms = 15000, headers = {}) {
-  const res = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers: { 'user-agent': UA, 'content-type': 'application/json', accept: 'application/json', ...headers },
-    body: JSON.stringify(body),
-  }, ms);
-  return res.json();
+export async function postJson(url, body, ms = 20000, headers = {}) {
+  return retry(async () => {
+    const res = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'user-agent': UA, 'content-type': 'application/json', accept: 'application/json', ...headers },
+      body: JSON.stringify(body),
+    }, ms);
+    return res.json();
+  });
+}
+
+/** One retry for transient network failures; 4xx is permanent, don't retry. */
+async function retry(fn, attempts = 2) {
+  let last;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      last = error;
+      if (/HTTP 4\d\d/.test(String(error?.message))) throw error;
+      if (i < attempts - 1) await sleep(500);
+    }
+  }
+  throw last;
 }
 
 export function sleep(ms) {
