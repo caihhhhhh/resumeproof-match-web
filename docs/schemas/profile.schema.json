@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://resumeproof.app/schemas/profile.schema.json",
+  "title": "CandidateProfile",
+  "description": "Structured candidate profile. The fact ledger is the only source a rewrite may quote from.",
+  "type": "object",
+  "required": ["schema_version", "user_id", "updated_at", "identity", "target", "facts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "user_id": { "type": "string", "minLength": 8 },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "identity": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "headline": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "level"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "level": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["tracks", "locations", "salary_floor_k", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "tracks": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "locations": { "type": "array", "items": { "type": "string" } },
+        "remote": { "enum": ["onsite", "remote", "hybrid", "any"] },
+        "timezone": { "type": "string" },
+        "salary_floor_k": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "default": "CNY" },
+        "seniority": { "type": "string" },
+        "max_required_experience_years": { "type": "number", "minimum": 0 }
+      }
+    },
+    "facts": {
+      "type": "array",
+      "description": "Confirmed only. A fact enters the ledger with confirmed=false and must be flipped by the user or by an explicit evidence check.",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "org", "title", "start", "confirmed"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^fact_[a-z0-9_]+$" },
+          "kind": { "enum": ["role", "project", "education", "certificate", "award", "metric"] },
+          "org": { "type": "string" },
+          "title": { "type": "string" },
+          "start": { "type": "string", "description": "YYYY-MM" },
+          "end": { "type": ["string", "null"], "description": "YYYY-MM, null means present" },
+          "location": { "type": "string" },
+          "bullets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["text"],
+              "additionalProperties": false,
+              "properties": {
+                "text": { "type": "string", "description": "Canonical wording, not necessarily the resume sentence." },
+                "metrics": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["value", "context"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "value": { "type": "string" },
+                      "unit": { "type": "string" },
+                      "context": { "type": "string" }
+                    }
+                  }
+                },
+                "source_quote": { "type": "string", "description": "Exact sentence from the uploaded resume or Obsidian record." }
+              }
+            }
+          },
+          "skills": { "type": "array", "items": { "type": "string" } },
+          "confirmed": { "type": "boolean" },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "ref"],
+              "additionalProperties": false,
+              "properties": {
+                "type": { "enum": ["resume", "obsidian", "portfolio", "user_statement"] },
+                "ref": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "level": { "enum": ["aware", "working", "strong", "expert"] },
+          "evidence_fact_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "excluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "companies": { "type": "array", "items": { "type": "string" } },
+        "terms": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "description": "Recorded at upload. Absence of consent blocks LLM processing and raw-resume retention.",
+      "additionalProperties": false,
+      "properties": {
+        "llm_processing": { "type": "boolean" },
+        "store_raw_resume": { "type": "boolean" },
+        "granted_at": { "type": "string", "format": "date-time" },
+        "policy_version": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://resumeproof.app/schemas/job.schema.json",
+  "title": "Job",
+  "description": "One normalized posting. Raw source payload is kept in rawSource so a re-parse never needs a second fetch.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "source",
+    "source_job_id",
+    "url",
+    "title",
+    "company",
+    "captured_at",
+    "jd_text",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": {
+      "type": "string",
+      "description": "Stable local id, source:source_job_id.",
+      "pattern": "^[a-z0-9_-]+:[A-Za-z0-9._-]+$"
+    },
+    "source": {
+      "enum": ["greenhouse", "lever", "ashby", "company", "boss", "liepin", "linkedin", "manual"]
+    },
+    "source_job_id": { "type": "string" },
+    "url": { "type": "string", "format": "uri" },
+    "apply_url": { "type": "string", "format": "uri" },
+    "title": { "type": "string", "minLength": 1 },
+    "company": { "type": "string", "minLength": 1 },
+    "company_domain": { "type": "string" },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "raw": { "type": "string" },
+        "city": { "type": "string" },
+        "region": { "type": "string" },
+        "country": { "type": "string" },
+        "remote": { "type": "boolean" }
+      }
+    },
+    "employment_type": { "type": "string" },
+    "seniority": { "type": "string" },
+    "salary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "currency": { "type": "string" },
+        "period": { "enum": ["year", "month", "day", "hour"] },
+        "raw": { "type": "string" }
+      }
+    },
+    "posted_at": { "type": "string", "format": "date-time" },
+    "captured_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "jd_text": { "type": "string", "minLength": 40 },
+    "requirements": { "type": "array", "items": { "type": "string" } },
+    "skills": { "type": "array", "items": { "type": "string" } },
+    "dedupe_hash": {
+      "type": "string",
+      "description": "sha256 of lowercased company + normalized title + location; catches the same role posted on several boards."
+    },
+    "status": {
+      "enum": ["discovered", "shortlisted", "rejected", "applied", "expired"]
+    },
+    "rawSource": { "type": "object", "description": "Verbatim board payload, for re-parsing." }
+  }
+}

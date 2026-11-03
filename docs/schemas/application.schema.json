@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://resumeproof.app/schemas/application.schema.json",
+  "title": "Application",
+  "description": "One attempt to reach one employer. A channel jump still creates an application row so the funnel is complete.",
+  "type": "object",
+  "required": ["schema_version", "id", "user_id", "job_id", "channel", "status", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^app_[a-z0-9]+$" },
+    "user_id": { "type": "string" },
+    "job_id": { "type": "string" },
+    "channel": { "enum": ["email", "jump", "platform", "manual"] },
+    "status": {
+      "enum": [
+        "draft",
+        "ready",
+        "sent",
+        "replied",
+        "interview",
+        "offer",
+        "rejected",
+        "withdrawn"
+      ]
+    },
+    "resume_version_id": { "type": "string" },
+    "cover_letter": { "type": "string" },
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "source": { "enum": ["jd_text", "company_page", "user_input"] }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "sent_at": { "type": "string", "format": "date-time" },
+    "follow_up_at": { "type": "string", "format": "date-time" },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "result": { "enum": ["no_response", "screen", "interview", "offer", "rejected"] },
+        "at": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "description": "Recorded before any outbound action.",
+      "additionalProperties": false,
+      "properties": {
+        "share_resume": { "type": "boolean" },
+        "recorded_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "ref"],
+        "additionalProperties": false,
+        "properties": {
+          "type": { "enum": ["submitted_pdf", "screenshot", "email_id", "page_url"] },
+          "ref": { "type": "string" }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}
