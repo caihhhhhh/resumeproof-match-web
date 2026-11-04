@@ -13,7 +13,7 @@
     "start": "vinext start",
     "jobs:discover": "node scripts/jobs/discover.mjs",
     "jobs:bridge": "node scripts/jobs/bridge.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern tmp",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern tmp --ignore-pattern work --ignore-pattern outputs --ignore-pattern .wrangler --ignore-pattern .openai",
     "jobs:cn": "node scripts/jobs/jobpro.mjs"
   },
   "dependencies": {

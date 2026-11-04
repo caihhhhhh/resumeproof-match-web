@@ -12,7 +12,6 @@
  *                (BOSS / 猎聘 / 智联); handled by bridge.mjs + discover.mjs
  */
 import {
-  fetchWithTimeout,
   getJson,
   makeJob,
   parseCnDate,

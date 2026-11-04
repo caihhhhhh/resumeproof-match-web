@@ -52,9 +52,13 @@ export default defineConfig(async () => {
     optimizeDeps: {
       include: ['@react-pdf/renderer', 'unicode-properties', 'base64-js'],
     },
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      watch: {
+        useFsEvents: isCodexSeatbeltSandbox ? false : undefined,
+        usePolling: isCodexSeatbeltSandbox ? true : undefined,
+        ignored: ['**/tmp/**', '**/dist/**', '**/work/**', '**/outputs/**', '**/.wrangler/**', '**/*.tmpdir/**'],
+      },
+    },
     plugins: [
       vinext(),
       sites(),

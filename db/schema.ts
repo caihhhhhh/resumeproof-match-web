@@ -84,3 +84,41 @@ export const feedbackEventsTimeIndex = `
 CREATE INDEX IF NOT EXISTS idx_feedback_events_time
 ON feedback_events (occurred_at_ms DESC)
 `;
+
+export const savedJobsSchema = `
+CREATE TABLE IF NOT EXISTS saved_jobs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  site TEXT NOT NULL,
+  dedupe_hash TEXT NOT NULL,
+  title TEXT NOT NULL,
+  company TEXT NOT NULL DEFAULT '',
+  salary TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL,
+  jd TEXT NOT NULL DEFAULT '',
+  captured_at_ms INTEGER NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL,
+  UNIQUE (user_id, dedupe_hash)
+)
+`;
+
+export const savedJobsUserIndex = `
+CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_time
+ON saved_jobs (user_id, captured_at_ms DESC)
+`;
+
+export const syncTokensSchema = `
+CREATE TABLE IF NOT EXISTS sync_tokens (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  last_used_at_ms INTEGER
+)
+`;
+
+export const syncTokensUserIndex = `
+CREATE INDEX IF NOT EXISTS idx_sync_tokens_user
+ON sync_tokens (user_id, created_at_ms DESC)
+`;

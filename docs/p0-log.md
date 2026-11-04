@@ -70,6 +70,26 @@
 - 短名单头部：网易「海外广告投放」19 分、网易「海外市场营销（UA策略）18、MiniMax「市场营销经理-海外方向」16、MiniMax「海外广告投放」16、小红书「品牌与种草广告」16、腾讯「SLG-海外游戏投放经理」15。
 - 观察：飞书招聘系（MiniMax/小鹏/蔚来/智元）岗位新、JD 完整；Moka 系（MiniMax/小红书/米哈游/DeepSeek）质量高但部分岗位无 JD；猎聘聚合源（菜鸟）只有跳转链接。
 
+## P0.4 站内岗位库 + 插件批量采集（2026-11-04）
+
+### 实现
+- **D1**：`db/schema.ts` 加 `saved_jobs`（`UNIQUE(user_id, dedupe_hash)`，字段 title/company/salary/location/url/jd/site/captured_at_ms）与 `sync_tokens`（只存 token 的 sha256）。
+- **API**：`GET /api/jobs`（登录，搜索 + 分页）、`POST /api/jobs`（`Bearer` 同步令牌，`{site,jobs[]}`，1..30 条，限 60 次/分、2MB）、`DELETE /api/jobs/[id]`、`POST /api/jobs/sync-token`（登录签发 64 位 hex）。
+- **页面**：`/jobs`，登录后可见；搜索框、站点 badge、JD 220 字摘要、「打开原岗位 / 用这份 JD 匹配」、分页、空状态、令牌卡片（三步接入说明）。
+- **插件**：`tools/capture-extension/content.js` 列表页注入「采集本页 (N)」，抓当前已渲染的 ≤30 张卡片（多层选择器兜底、URL 去重、不自动翻页）；详情页单条采集保留。
+- **桥**：`POST /capture/batch`（全量校验、索引化错误、启动时扫 inbox 去重）；`sync --token <token> --site <baseUrl>`（按站点分组、30 条/请求、2xx 后移入 `tmp/jobs/synced`、失败保留文件并退出码 1）。
+
+### 实测
+- 本地 dev（Cloudflare/workerd）签发令牌 → `POST /api/jobs` 2 条 → `GET` total=2 → 重复同步 total 仍 2（幂等）→ `/jobs` HTML 含标题 → 删除 1 条 → 剩 1 条 → 无令牌 POST 401。
+- 桥 `sync`：2 个文件 → 2 个请求 → 文件移入 `tmp/jobs/synced`；mock 400 时退出码 1 且保留文件。
+- 校验：`npx tsc --noEmit`、`npm run lint`、`npm run build` 通过。
+- 环境坑：`vinext start` 不支持 `cloudflare:workers`（`ERR_UNSUPPORTED_ESM_URL_SCHEME`），必须 `npm run dev`；dev 下要带 `Cookie: __sites_local_auth=1` 才会注入本地用户头（插件会剥掉伪造的 `oai-*` 头）；dev 只监听 `::1`，用 `http://localhost:3001`。
+
+### 未做
+- 引擎结果（`tmp/jobs/jobs.json`）尚未写 D1 `jobs` 表；`/jobs` 目前只显示插件同步的岗位。
+- 尚未部署到线上 Sites（本地验证通过，发布动作待定）。
+- 插件选择器未在真实 BOSS/智联/猎聘 页面回归。
+
 ## 下一步
 
 1. 引擎产物落 D1（`jobs` 表）+ 定时抓取 + 站内「上传后匹配」读取，否则用户在网站上还看不到这批岗位。
