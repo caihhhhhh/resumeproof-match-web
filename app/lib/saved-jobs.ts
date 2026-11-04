@@ -140,40 +140,72 @@ function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
-export async function listSavedJobs(userId: string, options: { q?: string; limit?: number; offset?: number } = {}) {
+export async function listSavedJobs(
+  userId: string,
+  options: { q?: string; site?: string; limit?: number; offset?: number } = {},
+) {
   const db = database();
   if (!db) return [] as SavedJobRow[];
   await ensureSchema(db);
   const limit = Math.min(60, Math.max(1, options.limit ?? 30));
   const offset = Math.max(0, options.offset ?? 0);
   const q = (options.q ?? '').trim().slice(0, 80);
+  const site = SAVED_JOB_SITES.has(options.site ?? '') ? options.site : '';
   const columns = 'id, site, title, company, salary, location, url, jd, captured_at_ms';
+  const where: string[] = ['user_id = ?'];
+  const values: unknown[] = [userId];
+  if (site) {
+    where.push('site = ?');
+    values.push(site);
+  }
   if (q) {
     const like = `%${escapeLike(q)}%`;
-    const result = await db.prepare(`
-      SELECT ${columns} FROM saved_jobs
-      WHERE user_id = ? AND (title LIKE ? ESCAPE '\\' OR company LIKE ? ESCAPE '\\')
-      ORDER BY captured_at_ms DESC
-      LIMIT ? OFFSET ?
-    `).bind(userId, like, like, limit, offset).all<SavedJobRow>();
-    return result.results ?? [];
+    where.push("(title LIKE ? ESCAPE '\\' OR company LIKE ? ESCAPE '\\')");
+    values.push(like, like);
   }
   const result = await db.prepare(`
     SELECT ${columns} FROM saved_jobs
-    WHERE user_id = ?
+    WHERE ${where.join(' AND ')}
     ORDER BY captured_at_ms DESC
     LIMIT ? OFFSET ?
-  `).bind(userId, limit, offset).all<SavedJobRow>();
+  `).bind(...values, limit, offset).all<SavedJobRow>();
   return result.results ?? [];
 }
 
-export async function countSavedJobs(userId: string) {
+export async function countSavedJobs(userId: string, options: { q?: string; site?: string } = {}) {
   const db = database();
   if (!db) return 0;
   await ensureSchema(db);
-  const row = await db.prepare('SELECT COUNT(*) AS total FROM saved_jobs WHERE user_id = ?')
-    .bind(userId).first<{ total: number }>();
+  const q = (options.q ?? '').trim().slice(0, 80);
+  const site = SAVED_JOB_SITES.has(options.site ?? '') ? options.site : '';
+  const where: string[] = ['user_id = ?'];
+  const values: unknown[] = [userId];
+  if (site) {
+    where.push('site = ?');
+    values.push(site);
+  }
+  if (q) {
+    const like = `%${escapeLike(q)}%`;
+    where.push("(title LIKE ? ESCAPE '\\' OR company LIKE ? ESCAPE '\\')");
+    values.push(like, like);
+  }
+  const row = await db.prepare(`SELECT COUNT(*) AS total FROM saved_jobs WHERE ${where.join(' AND ')}`)
+    .bind(...values).first<{ total: number }>();
   return row?.total ?? 0;
+}
+
+export async function countSavedJobsBySite(userId: string) {
+  const db = database();
+  if (!db) return {} as Record<string, number>;
+  await ensureSchema(db);
+  const result = await db.prepare(`
+    SELECT site, COUNT(*) AS total FROM saved_jobs
+    WHERE user_id = ?
+    GROUP BY site
+  `).bind(userId).all<{ site: string; total: number }>();
+  const counts: Record<string, number> = {};
+  for (const row of result.results ?? []) counts[row.site] = row.total;
+  return counts;
 }
 
 export async function deleteSavedJob(userId: string, id: number) {

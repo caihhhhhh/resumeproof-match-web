@@ -65,7 +65,7 @@ export function JobsSyncToken() {
       {error ? <p className="jobs-token-error" role="alert">{error}</p> : null}
 
       <ol className="jobs-token-steps">
-        <li>安装 <code>tools/capture-extension</code> 到 Chrome（开发者模式 → 加载已解压的扩展程序）。</li>
+        <li>安装 <a href="/downloads/resumeproof-capture.zip" download>采集扩展</a>（解压后在 Chrome 开发者模式 → 加载已解压的扩展程序；<a href="/extension">安装说明</a>）。</li>
         <li>启动本机桥：<code>node scripts/jobs/bridge.mjs</code>，默认监听 127.0.0.1:7717。</li>
         <li>在平台搜索页点「采集本页」，再运行 <code>node scripts/jobs/bridge.mjs sync --token &lt;令牌&gt; --site &lt;站点地址&gt;</code>。</li>
       </ol>

@@ -14,7 +14,8 @@
     "jobs:discover": "node scripts/jobs/discover.mjs",
     "jobs:bridge": "node scripts/jobs/bridge.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern tmp --ignore-pattern work --ignore-pattern outputs --ignore-pattern .wrangler --ignore-pattern .openai",
-    "jobs:cn": "node scripts/jobs/jobpro.mjs"
+    "jobs:cn": "node scripts/jobs/jobpro.mjs",
+    "ext:zip": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Compress-Archive -Path tools/capture-extension/* -DestinationPath public/downloads/resumeproof-capture.zip -Force\""
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

@@ -4,6 +4,8 @@ BOSS直聘 / 猎聘 / 智联招聘 没有公开岗位 API，服务端抓取又�
 
 ## 安装
 
+站点上提供打包下载：`/extension` 页面 → 下载 zip → 解压到固定目录 → `chrome://extensions` 加载已解压的扩展程序。也可以直接用本目录加载。
+
 1. 启动捕获桥：
    ```
    node scripts/jobs/bridge.mjs
@@ -56,3 +58,8 @@ node scripts/jobs/bridge.mjs sync --token <token> --site <baseUrl> [--inbox tmp/
 
 - 详情页：`content.js` 里每个字段都有多层选择器 + 兜底（`main` 文本），失效时通常还能抓到 JD，只是标题/公司可能不准。改版后按实际 DOM 调整 `extractTitle` / `extractCompany` / `extractJd`。
 - 列表页：卡片容器在 `CARD_SELECTORS`，字段在 `FIELD_SELECTORS`（`title` / `company` / `salary` / `location` / `link` 均为选择器数组，按顺序兜底）。字段缺失时标题会退回链接文本，薪资/地点会退回卡片文本正则；没有标题或链接的卡片会被跳过。
+
+## 打包发布
+
+
+pm run ext:zip 会重新生成 `public/downloads/resumeproof-capture.zip`（Windows 下用 PowerShell Compress-Archive）。站点 `/extension` 的下载按钮指向这个文件；改完 `content.js` 后记得重新打包并提交 zip。

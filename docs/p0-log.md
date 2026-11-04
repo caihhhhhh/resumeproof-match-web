@@ -98,3 +98,20 @@
 4. 国内缺口：大疆/SHEIN/联想/中兴/得物/完美世界/鹰角/同程旅行 自建接口未覆盖，逐个验证后加 catalog。
 
 
+
+## P0.5 站内扩展下载 + 首轮试跑（2026-11-04）
+
+### 实现
+- `app/extension/page.tsx` + `app/extension/extension.css`：公开安装页（四步、边界、FAQ、下载），导航 + 页尾 + 首页结尾各加入口。
+- `public/downloads/resumeproof-capture.zip`（7,091 字节，manifest 在根目录）；`npm run ext:zip` 用 Compress-Archive 重新打包，`tools/capture-extension/README.md` 记录流程。
+- `/jobs`：来源筛选（站点 chip + 每站计数）、`countSavedJobsBySite`、`site` 查询参数、顶部「下载采集扩展 / 直接匹配现有 JD」两个 CTA、令牌卡片步骤改为链接到安装页与 zip。
+
+### 试跑
+- 桥 `POST /capture/batch` 收到 30 条 BOSS 岗位（米哈游/小红书/网易等）→ `202 accepted 30`；`bridge sync` 1 个请求推送 30 条，文件移入 `tmp/jobs/synced`；`/jobs` 渲染 30 张卡片，搜索「米哈游」3 条，`GET /api/jobs` total=30。
+- 真实匹配：`RENZO_Resume_Channel_Growth_CN_Formal.pdf` 抽正文 + Stripe Growth Marketing Manager (Greater China) JD → `POST /api/match/analyze` 200，14.1s，16 evidence / 4 hardRequirements。
+- 校验：`npx tsc --noEmit`、`npm run lint`、`npm run build` 通过；扩展页与 zip 均 200。
+- 环境：dev 仍在 3001（旧进程复用），桥在 7717。
+
+### 未做
+- 线上未发布：DSH 环境没有 Sites 发布通道，需要回到 ChatGPT/Codex 的 Sites 动作重新部署。
+- 扩展选择器未在真实 BOSS/智联/猎聘 页面回归；30 条试跑数据是构造的。
