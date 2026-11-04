@@ -115,3 +115,19 @@
 ### 未做
 - 线上未发布：DSH 环境没有 Sites 发布通道，需要回到 ChatGPT/Codex 的 Sites 动作重新部署。
 - 扩展选择器未在真实 BOSS/智联/猎聘 页面回归；30 条试跑数据是构造的。
+
+## P0.6 真实页面回归：猎聘 30 条打通，BOSS 被 IP 风控（2026-11-04）
+
+### 结果
+- **猎聘真实回归通过**：`https://www.liepin.com/zhaopin/?key=增长` 未登录仍渲染 30 张卡；点「采集本页 (30)」→ 桥 inbox 30 个文件 → `bridge sync` 一次请求 → `/jobs` 显示 30 条 / 1 个来源，卡片含标题、公司、薪资、地点（如「电商商品运营经理…｜喵铮铮｜20-40k｜上海-闵行区」「蚂蚁财富海外-用户增长…｜蚂蚁集团｜30-60k·15薪｜深圳-南山区」）。构造数据已全部清掉，库里只剩这次真实采集。
+- **BOSS 无法回归**：匿名和新开的干净 Chrome 窗口都 302 到 `https://www.zhipin.com/web/passport/zp/verify.html?...&code=35`，文案「当前 IP 地址可能存在异常访问行为」——本机出口 IP 已被 BOSS 风控标记（大概率是之前服务端探测触发）。这不是选择器问题；换网络或等风控解除后才能验证。
+- **智联站点结构已换代**：`sou.zhaopin.com` 会跳 `www.zhaopin.com/jobs/?kw=…`，卡片是 `.job-card`（`__title-main`/`__salary`/`__skill-tag`），且卡片内只有公司详情链接、没有岗位 URL（点击在 SPA 内开详情）。现有选择器与「必须有岗位 URL」的约束都不匹配，需要单独一版适配。
+- 猎聘真实 DOM 也已改成 CSS Modules（`_40108OjE3M jobCardPcContainer`、`jobTitleBox`、`jobCompanyInfoBox`），旧 `.job-list-item` 完全失效；已补 `[class*="jobCardPcContainer"]`、`[class*="jobTitleBox"]`、`.jobCompanyInfoBox .companyName`、`【…】` 地点解析。
+
+### 修复
+- **Chrome 138+ Local Network Access**：HTTPS 页面里的 content script 直接 `fetch('http://127.0.0.1:7717')` 会被 LNA 拦住（请求挂起，不报错）。改为 content script → `background.js` service worker → 桥；manifest 升 0.2.0，`host_permissions` 保留 `http://127.0.0.1:7717/*`，重新打包 zip。
+- 桥加 `access-control-allow-private-network: true`，配合 service worker 的预检。
+- 采集按钮卡在「发送中…」的问题随 service worker 改造一起消失。
+
+### 仍需
+- 智联适配（新 DOM + SPA 详情 URL）；BOSS 等 IP 解封后回归；线上发布。

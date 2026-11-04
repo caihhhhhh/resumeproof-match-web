@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "ResumeProof 岗位捕获",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "只在点击时，把当前 BOSS/猎聘/智联 岗位详情发送到本地 ResumeProof。不后台翻页、不自动投递。",
   "permissions": ["activeTab"],
   "host_permissions": ["http://127.0.0.1:7717/*"],
+  "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
       "matches": [

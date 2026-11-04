@@ -50,6 +50,28 @@
     setTimeout(() => el.remove(), 4000);
   }
 
+  // The service worker owns the request to 127.0.0.1; a content script on an
+  // HTTPS page is blocked by mixed-content / Local Network Access checks.
+  async function post(path, payload) {
+    if (globalThis.chrome?.runtime?.id) {
+      const reply = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'rp-capture', path, payload }, resolve);
+        setTimeout(() => resolve(null), 15000);
+      });
+      if (!reply) throw new Error('扩展后台无响应，重开浏览器后再试');
+      if (!reply.ok) throw new Error(reply.data?.error || reply.error || `HTTP ${reply.status}`);
+      return reply.data;
+    }
+    const res = await fetch(`${BRIDGE}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
   // ---------------------------------------------------------------- detail page
 
   function extractTitle() {
@@ -131,13 +153,7 @@
       button.disabled = true;
       button.textContent = '发送中…';
       try {
-        const res = await fetch(`${BRIDGE}/capture`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        await post('/capture', payload);
         toast('已捕获，运行 discover.mjs 即可并入短名单');
         button.textContent = '已捕获 ✓';
       } catch (error) {
@@ -155,7 +171,7 @@
   const CARD_SELECTORS = {
     boss: ['.job-card-wrapper', '.job-list-box > li', '.job-list-box .job-card-wrapper', '[class*="job-card-wrapper"]'],
     zhaopin: ['.joblist-box__item', '.joblist-item', '[class*="joblist-box__item"]', '[class*="joblist-item"]'],
-    liepin: ['.job-list-item', '.job-list-box > li', '[class*="job-list-item"]'],
+    liepin: ['[class*="jobCardPcContainer"]', '.job-list-item', '.job-list-box > li', '[class*="job-list-item"]'],
   };
 
   const FIELD_SELECTORS = {
@@ -174,11 +190,11 @@
       link: ['a[href*="jobs.zhaopin.com"]', 'a[href*="/jobdetail"]', 'a[href*="/job/"]', 'a'],
     },
     liepin: {
-      title: ['.job-title', '.job-name', '[class*="job-title"]', 'h3 a', 'h3'],
-      company: ['.company-name', '.job-company', '[class*="company-name"]'],
+      title: ['.jobTitleBox div[title]', '[class*="jobTitleBox"]', '.job-title', '.job-name', '[class*="job-title"]', 'h3 a', 'h3'],
+      company: ['.jobCompanyInfoBox .companyName', '.companyName', '.company-name', '.job-company', '[class*="company-name"]'],
       salary: ['.job-salary', '.salary', '[class*="salary"]'],
       location: ['.job-detail-location', '.job-location', '[class*="location"]', '[class*="area"]'],
-      link: ['a[href*="/job/"]', 'a[href*="/zhaopin/"]', 'a'],
+      link: ['a[data-nick="job-detail-job-info"]', 'a[href*="/job/"]', 'a[href*="/zhaopin/"]', 'a'],
     },
   };
 
@@ -240,6 +256,10 @@
         salary = match ? match[0].replace(/\s+/g, ' ') : '';
       }
       let location = firstText(card, fields.location);
+      if (!location && site === 'liepin') {
+        const bracket = cardText.match(/【([^】]{1,30})】/);
+        if (bracket) location = bracket[1];
+      }
       if (!location) {
         const match = cardText.match(CITY_RE);
         location = match ? match[0] : '';
@@ -279,13 +299,7 @@
       batchButton.disabled = true;
       batchButton.textContent = '发送中…';
       try {
-        const res = await fetch(`${BRIDGE}/capture/batch`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ site, pageUrl: location.href, jobs }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        const data = await post('/capture/batch', { site, pageUrl: location.href, jobs });
         toast(`已采集 ${data.accepted ?? 0} 条（重复 ${data.duplicates ?? 0}）`, '', '132px');
       } catch (error) {
         toast(`采集失败：${error.message}`, 'error', '132px');
