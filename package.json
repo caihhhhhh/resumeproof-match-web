@@ -13,7 +13,8 @@
     "start": "vinext start",
     "jobs:discover": "node scripts/jobs/discover.mjs",
     "jobs:bridge": "node scripts/jobs/bridge.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern tmp"
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern tmp",
+    "jobs:cn": "node scripts/jobs/jobpro.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

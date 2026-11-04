@@ -33,6 +33,7 @@ const scope = String(flag('--scope', 'all'));
 const concurrency = Math.max(1, Number(flag('--concurrency', 4)));
 const perCompany = Math.max(1, Number(flag('--per-company', 6)));
 const withInbox = !has('--no-inbox');
+const withCn = !has('--no-cn');
 
 const CN_TERMS = ['营销', '市场', '品牌', '投放', '广告', '增长', '运营', '推广', '商务', '海外', '商业化', 'GTM'];
 const GD_CITIES = ['深圳', '广州', '东莞', '佛山', '珠海', '惠州', '中山', '江门', '肇庆'];
@@ -69,7 +70,7 @@ async function mapLimit(items, limitN, worker) {
   return results;
 }
 
-async function runEntry(entry, profile) {
+async function runEntry(entry) {
   const adapter = ADAPTERS[entry.adapter];
   if (!adapter) throw new Error(`unknown adapter: ${entry.adapter}`);
   if (entry.enabled === false) return [];
@@ -96,10 +97,12 @@ function isRejected(job, constraints, cities) {
   const title = job.title.toLowerCase();
   const jd = job.jd_text.toLowerCase();
   const city = job.location.city ?? '';
-  if (/实习|\bintern\b|\binternship\b/.test(title)) return 'internship';
+  if (/实习|校招|应届|培训生/.test(`${title} ${job.employment_type ?? ''}`)) return 'internship';
   // Engineering/design titles match "monetization"/"growth" in the JD but are
   // not roles this profile can take; the title gate alone let them through.
   if (/\b(engineer|engineering|developer|scientist|designer|architect|devops|sre)\b/i.test(title)) return 'title-unrelated';
+  if (/产品经理|产品专家|设计师|工程师|开发|算法|数据分析|分析师|架构师/.test(title)) return 'title-unrelated';
+  if (/销售|\brecruiter\b|talent acquisition|\bhr\b/i.test(title)) return 'title-unrelated';
   const maxYears = constraints.max_required_experience_years;
   if (typeof maxYears === 'number' && typeof job._requiredYears === 'number' && job._requiredYears > maxYears) {
     return `requires-${job._requiredYears}y`;
@@ -246,7 +249,7 @@ async function main() {
   const raw = [];
   const settled = await mapLimit(entries, concurrency, async (entry) => {
     try {
-      const jobs = await runEntry(entry, profile);
+      const jobs = await runEntry(entry);
       jobs.forEach((job) => {
         job._scope = entry.scope;
         job.rawSource = { ...(job.rawSource ?? {}), scope: entry.scope, sourceId: entry.id };
@@ -266,6 +269,31 @@ async function main() {
     raw.push(job);
   });
   if (captures.length) perSource.captures = { ok: true, jobs: captures.length };
+
+  // Chinese companies scanned through the MIT @ha7ch/job-pro CLI (Moka /
+  // Feishu / Beisen / bespoke). Produced by scripts/jobs/jobpro.mjs.
+  let cnJobs = 0;
+  if (withCn) {
+    try {
+      const cn = JSON.parse(await readFile(path.join(outDir, 'cn.json'), 'utf8'));
+      (cn.jobs ?? []).forEach((job) => {
+        job._scope = 'cn';
+        raw.push(job);
+      });
+      cnJobs = cn.jobs?.length ?? 0;
+      if (cnJobs) {
+        perSource.jobpro = {
+          ok: true,
+          jobs: cnJobs,
+          companies: cn.companiesHit,
+          hydrated: cn.hydrated,
+          generatedAt: cn.generatedAt,
+        };
+      }
+    } catch {
+      /* no domestic scan yet; --scope cn still works via direct APIs */
+    }
+  }
 
   const seenId = new Set();
   const seenHash = new Set();
@@ -317,7 +345,7 @@ async function main() {
     generatedAt: startedAt.toISOString(),
     profile: profilePath,
     scope,
-    sources: entries.length,
+    sources: entries.length + (cnJobs ? 1 : 0),
     fetched: raw.length,
     deduped: unique.length,
     passed: passed.length,
