@@ -131,3 +131,22 @@
 
 ### 仍需
 - 智联适配（新 DOM + SPA 详情 URL）；BOSS 等 IP 解封后回归；线上发布。
+
+## P0.7 简历优先：批量优化页 + list 采集补 JD（2026-11-04）
+
+### 背景
+用户原话：「这个插件没办法使用啊，如果是要做插件的话我希望是先让使用者上传了简历然后挑选了心仪的岗位和使用插件最好批量提取岗位进行简历优化输出」——装解压扩展 + 起本机桥 + 过 Chrome LNA，对公开用户门槛太高。主路径改为站内完成。
+
+### 实现
+- `app/match/batch/page.tsx`：登录门禁，`?ids=` 预选（≤10），导航/hero 入口。
+- `app/components/batch-optimizer.tsx`：本机简历（`resumeproof-base-resume-v1` / session 草稿）→ 选岗 → 逐条 `POST /api/match/analyze`（90s 超时）→ 分数/结论/改写建议 → 合并 HTML 导出；缺 JD 的岗位禁用并提示去详情页采集。
+- `scripts/jobs/bridge.mjs`：`sync` 前按需抓详情页 JSON-LD `JobPosting.description` 补 JD（4 并发、12s、失败不阻断）。
+- `app/jobs/page.tsx` + `batch.css`：入口与三块面板样式。
+
+### 验证
+- `tsc` / `eslint` / `vinext build` 通过；构建路由含 `/match/batch`。
+- 猎聘 30 条 sync 补 JD 30/30（926 字例）；批量页实跑 2 条，各约 7s，返回 `32/100 · B · 确认后再投递`、`38/100 · B · 确认后再投递`，无 JS 异常；截图 `tmp/p0/batch.png`。
+- 首次跑出现 `MATERIALS_TOO_SHORT`：列表采集 `jd` 为空，`/api/match/analyze` 要求简历与 JD 均 ≥80 字；补 JD 后解决，并在 UI 里禁用缺 JD 的岗位。
+
+### 仍未做
+- 线上未发布；BOSS 仍 IP 风控；智联列表页无岗位 URL；批量页还不能逐条导出单份定向简历（先出对照报告）。

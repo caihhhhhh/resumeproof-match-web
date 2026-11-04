@@ -121,6 +121,88 @@ function validateBatch(body) {
   return { site, pageUrl, jobs };
 }
 
+function decodeEntities(value) {
+  return value
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function stripTags(html) {
+  return decodeEntities(
+    html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|li|div|h[1-6])>/gi, '\n')
+      .replace(/<[^>]+>/g, ' '),
+  )
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// Liepin/Zhaopin detail pages embed a schema.org JobPosting with the full JD.
+function jsonLdDescription(html) {
+  const blocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+  for (const block of blocks) {
+    const body = block.replace(/^[\s\S]*?>/, '').replace(/<\/script>$/i, '');
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      continue;
+    }
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      if (item['@type'] !== 'JobPosting') continue;
+      if (typeof item.description === 'string' && item.description.trim()) {
+        return stripTags(item.description);
+      }
+    }
+  }
+  return '';
+}
+
+async function enrichJd(url) {
+  if (!/^https?:/i.test(url)) return '';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36',
+        'accept-language': 'zh-CN,zh;q=0.9',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) return '';
+    const html = await response.text();
+    const description = jsonLdDescription(html);
+    return description.length >= 80 ? description.slice(0, 20_000) : '';
+  } catch {
+    return '';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function mapLimit(items, limit, worker) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  async function next() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await worker(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, next));
+  return results;
+}
+
 // sha256(site|url) of every capture already in the inbox, so a batch can skip
 // postings that a previous batch (or the single-job button) already stored.
 let seen = new Set();
@@ -230,18 +312,26 @@ async function runSync(args) {
   await mkdir(syncedDir, { recursive: true });
   let moved = 0;
   let requests = 0;
+  let enriched = 0;
   for (const [site, items] of groups) {
     for (let start = 0; start < items.length; start += MAX_JOBS) {
       const chunk = items.slice(start, start + MAX_JOBS);
+      const jds = await mapLimit(chunk, 4, async ({ record }) => {
+        const existing = typeof record.jd === 'string' ? record.jd.trim() : '';
+        if (existing.length >= 80) return existing;
+        const fetched = await enrichJd(record.url);
+        if (fetched) enriched += 1;
+        return fetched || existing;
+      });
       const payload = {
         site,
-        jobs: chunk.map(({ record }) => ({
+        jobs: chunk.map(({ record }, index) => ({
           title: String(record.title ?? ''),
           company: String(record.company ?? ''),
           salary: String(record.salary ?? ''),
           location: String(record.location ?? ''),
           url: record.url,
-          jd: typeof record.jd === 'string' ? record.jd : '',
+          jd: jds[index],
         })),
       };
       requests += 1;
@@ -274,7 +364,7 @@ async function runSync(args) {
       console.log(`synced ${chunk.length} ${site} job(s) → ${syncedDir}`);
     }
   }
-  console.log(`sync done: ${moved} file(s) moved in ${requests} request(s)${skipped ? `, ${skipped} skipped` : ''}`);
+  console.log(`sync done: ${moved} file(s) moved in ${requests} request(s)${enriched ? `, ${enriched} JD enriched` : ''}${skipped ? `, ${skipped} skipped` : ''}`);
 }
 
 async function startServer() {

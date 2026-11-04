@@ -78,6 +78,7 @@ export default async function JobsPage({
           <Link href="/match/new">新建匹配</Link>
           <Link href="/guide">使用指南</Link>
           <Link className="is-active" href="/jobs">岗位库</Link>
+          <Link href="/match/batch">批量优化</Link>
           <Link href="/extension">采集扩展</Link>
           <a href={chatGPTSignOutPath('/')}>退出</a>
         </div>
@@ -94,6 +95,7 @@ export default async function JobsPage({
           <div className="jobs-hero-actions">
             <Link className="jobs-primary" href="/extension">下载采集扩展</Link>
             <Link className="jobs-secondary" href="/match/new">直接匹配现有 JD</Link>
+            <Link className="jobs-secondary" href="/match/batch">批量优化</Link>
           </div>
         </header>
 

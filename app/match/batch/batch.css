@@ -1,0 +1,168 @@
+.batch {
+  display: grid;
+  gap: 18px;
+  margin: 30px 0 90px;
+}
+
+.batch-panel {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--paper) 96%, white);
+}
+
+.batch-panel b { font-size: 15px; letter-spacing: -0.01em; }
+.batch-panel p { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.7; }
+
+.batch-panel.is-ready { border-color: color-mix(in srgb, #1f7a45 32%, var(--line)); }
+.batch-panel.is-missing { border-color: color-mix(in srgb, #b4621c 32%, var(--line)); }
+
+.batch-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.batch-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  padding: 14px;
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.7;
+  font-family: inherit;
+}
+
+.batch-textarea:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.batch-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.batch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.batch-job {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.batch-job input {
+  grid-row: span 4;
+  margin: 3px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
+}
+
+.batch-job b { font-size: 14px; line-height: 1.45; }
+.batch-job.is-selected { border-color: var(--ink); background: color-mix(in srgb, var(--ink) 4%, var(--paper)); }
+.batch-job.is-blocked { opacity: 0.55; cursor: not-allowed; }
+
+.batch-job-meta {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.batch-job-warn { color: #b4621c; }
+
+.batch-job .jobs-badge { justify-self: start; }
+
+.batch-run {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.batch-run .jobs-primary { white-space: nowrap; }
+
+.batch-progress {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.batch-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ink);
+  transition: width 0.4s ease;
+}
+
+.batch-results { display: grid; gap: 14px; margin-top: 6px; }
+.batch-results h2 { margin: 10px 0 0; font-size: 20px; letter-spacing: -0.02em; }
+
+.batch-result {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--paper) 96%, white);
+}
+
+.batch-result header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.batch-result header b { font-size: 16px; }
+.batch-result p { margin: 0; font-size: 13.5px; line-height: 1.7; }
+
+.batch-score { font-size: 14px; }
+.batch-score strong { font-size: 22px; letter-spacing: -0.02em; }
+
+.batch-suggestions { display: grid; gap: 12px; margin: 6px 0 0; padding-left: 18px; }
+.batch-suggestions li { font-size: 13.5px; line-height: 1.7; }
+.batch-suggestions p { margin: 4px 0 0; color: var(--muted); }
+
+.batch-diff s { color: color-mix(in srgb, var(--ink) 45%, var(--paper)); }
+.batch-diff ins { color: #0a7a3d; text-decoration: none; }
+
+.batch-error { color: #b42318; font-size: 13.5px; }
+.batch-muted { color: var(--muted); font-size: 13px; }
+.batch-muted a { color: var(--cobalt); text-decoration: underline; text-underline-offset: 3px; }
+
+.jobs-badge-official,
+.jobs-badge-greenhouse,
+.jobs-badge-lever,
+.jobs-badge-ashby,
+.jobs-badge-workday,
+.jobs-badge-jobpro {
+  background: color-mix(in srgb, var(--ink) 7%, var(--paper));
+  color: var(--ink);
+}
+
+@media (max-width: 720px) {
+  .batch-run { grid-template-columns: 1fr; }
+  .batch-panel { padding: 18px; }
+}
