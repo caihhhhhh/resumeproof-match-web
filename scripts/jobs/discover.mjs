@@ -102,7 +102,7 @@ function isRejected(job, constraints, cities) {
   // not roles this profile can take; the title gate alone let them through.
   if (/\b(engineer|engineering|developer|scientist|designer|architect|devops|sre)\b/i.test(title)) return 'title-unrelated';
   if (/产品经理|产品专家|设计师|工程师|开发|算法|数据分析|分析师|架构师/.test(title)) return 'title-unrelated';
-  if (/销售|\brecruiter\b|talent acquisition|\bhr\b/i.test(title)) return 'title-unrelated';
+  if (/销售|\brecruit(er|ing)\b|talent acquisition|\bhr\b|招聘/i.test(title)) return 'title-unrelated';
   const maxYears = constraints.max_required_experience_years;
   if (typeof maxYears === 'number' && typeof job._requiredYears === 'number' && job._requiredYears > maxYears) {
     return `requires-${job._requiredYears}y`;
